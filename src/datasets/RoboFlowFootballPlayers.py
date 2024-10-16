@@ -10,17 +10,25 @@ class RoboFlowFootballPlayers(Dataset):
         self.items = self.get_items()
 
     def get_items(self):
-        return os.listdir(f"{self.path}/{self.split}/images")
+        images = os.listdir(f"{self.path}/{self.split}/images")
+        ids = np.core.defchararray.replace(images, '.jpg', '')
+        return ids.tolist()
 
     def __len__(self):
         return len(self.items)
 
     def __getitem__(self, index):
         return {
-            "path": self.items[index]
+            "img": f"{self.path}/{self.split}/images/{self.items[index]}.jpg",
+            "label": f"{self.path}/{self.split}/labels/{self.items[index]}.txt"
         }
 
     def sample_images(self, n_images=5):
-        random_images = np.random.choice(
-            self.items, size=n_images, replace=False)
-        return random_images
+        random_indices = np.random.choice(
+            np.arange(0, len(self.items)), size=n_images, replace=False)
+        data = []
+        for index in random_indices:
+            # Use the __getitem__ method to get the image and label for each index
+            data.append(self.__getitem__(index))
+
+        return data
