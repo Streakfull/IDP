@@ -4,6 +4,7 @@ from skimage import io
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import torch
+from deep_sort.sk_learn_linear_assignment import linear_assignment
 
 import os
 import numpy as np
@@ -16,9 +17,10 @@ class Tracker(torch.nn.Module):
         super().__init__()
 
     def linear_assignment(self, cost_matrix):
-        from scipy.optimize import linear_sum_assignment
-        x, y = linear_sum_assignment(cost_matrix)
-        return np.array(list(zip(x, y)))
+        # x, y = linear_assignment(cost_matrix)
+        # return np.array(list(zip(x, y)))\
+        indices = linear_assignment(cost_matrix)
+        return indices
 
     def iou_batch(self, bb_test, bb_gt):
         """
