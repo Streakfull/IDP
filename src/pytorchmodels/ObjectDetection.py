@@ -38,7 +38,8 @@ class ObjectDetection(torch.nn.Module):
 
     def process_video(self, video, write_path="./logs/outputLive/"):
         cap = cv2.VideoCapture(video)
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        # total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        total_frames = 10
         frame = 0
         with tqdm(total=total_frames-1, desc="Processing frames", unit="frame") as pbar:
             while True:
