@@ -27,11 +27,8 @@ class ObjectDetectionTracking(ObjectDetection):
             while True:
                 _, img = cap.read()
                 det = self.predict(img)
+                detections = self.get_full_pred(det)
 
-                boxes = det[0].boxes.xyxy
-                cls = det[0].boxes.cls.unsqueeze(1)
-                conf = det[0].boxes.conf.unsqueeze(1)
-                detections = torch.cat((boxes, conf, cls), dim=1)
                 results = mot_tracker.update(detections)
                 frames = self.plot_boxes(results, img)
 

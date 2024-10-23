@@ -78,3 +78,10 @@ class ObjectDetection(torch.nn.Module):
                 pbar.update(1)
             cap.release()
             cv2.destroyAllWindows()
+
+    def get_full_pred(self, det):
+        boxes = det[0].boxes.xyxy
+        cls = det[0].boxes.cls.unsqueeze(1)
+        conf = det[0].boxes.conf.unsqueeze(1)
+        detections = torch.cat((boxes, conf, cls), dim=1)
+        return detections
