@@ -3,6 +3,7 @@ import torch
 import cvzone
 from sort import *
 from tqdm.notebook import tqdm
+from ultralytics import YOLO
 
 
 class ObjectDetection(torch.nn.Module):
@@ -13,8 +14,9 @@ class ObjectDetection(torch.nn.Module):
         self.CLASS_NAMES_DICT = self.model.model.names
 
     def load_model(self):
-        model = torch.hub.load('ultralytics/yolov5',
-                               'yolov5n', pretrained=True)
+        # model = torch.hub.load('ultralytics/yolov5',
+        #                        'yolov5n', pretrained=True)
+        model = YOLO("yolo11n.pt")
         return model
 
     def predict(self, img):

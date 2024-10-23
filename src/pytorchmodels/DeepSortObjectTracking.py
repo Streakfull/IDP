@@ -4,38 +4,30 @@ import torch
 import cvzone
 from sort import *
 from tqdm.notebook import tqdm
-from pytorchmodels.Sort import Sort
 
 
-class ObjectDetectionTracking(ObjectDetection):
+class DeepSortObjectTracking(ObjectDetection):
 
     def __init__(self, capture) -> None:
         super().__init__(capture)
-        self.max_age = 100
-        self.min_hits = 3
-        self.iou_threshold = 0.3
 
     def process_video(self, video, write_path="./logs/outputLive/"):
         cap = cv2.VideoCapture(video)
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-       # total_frames = 10
+        total_frames = 10
         frame = 0
-        mot_tracker = Sort(max_age=self.max_age,
-                           min_hits=self.min_hits,
-                           iou_threshold=self.iou_threshold)
+
         with tqdm(total=total_frames-1, desc="Processing frames", unit="frame") as pbar:
             while True:
                 _, img = cap.read()
                 det = self.predict(img)
+                import pdb
+                pdb.set_trace()
+                # results = mot_tracker.update(det.xyxy[0])
 
-                boxes = det[0].boxes.xyxy
-                cls = det[0].boxes.cls.unsqueeze(1)
-                conf = det[0].boxes.conf.unsqueeze(1)
-                detections = torch.cat((boxes, conf, cls), dim=1)
-                results = mot_tracker.update(detections)
-                frames = self.plot_boxes(results, img)
+                # frames = self.plot_boxes(results, img)
 
-                cv2.imwrite(f"{write_path}/frame_{frame}.jpg", frames)
+                # cv2.imwrite(f"{write_path}/frame_{frame}.jpg", frames)
                 frame += 1
                 pbar.update(1)
                 if (cv2.waitKey(1) == ord('q')):
