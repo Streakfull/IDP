@@ -1,3 +1,4 @@
+from types import MethodType
 import cv2
 import torch
 import cvzone
@@ -14,13 +15,14 @@ class ObjectDetection(torch.nn.Module):
         self.CLASS_NAMES_DICT = self.model.model.names
 
     def load_model(self):
-        # model = torch.hub.load('ultralytics/yolov5',
-        #                        'yolov5n', pretrained=True)
         model = YOLO("yolo11n.pt")
+        model.fuse()
         return model
 
     def predict(self, img):
         results = self.model(img)
+        # import pdb
+        # pdb.set_trace()
         return results
 
     def plot_boxes(self, results, img):
@@ -80,7 +82,12 @@ class ObjectDetection(torch.nn.Module):
             cv2.destroyAllWindows()
 
     def get_full_pred(self, det):
-        boxes = det[0].boxes.xyxy
+        try:
+            boxes = det[0].boxes.xyxy
+        except:
+            import pdb
+            pdb.set_trace()
+
         cls = det[0].boxes.cls.unsqueeze(1)
         conf = det[0].boxes.conf.unsqueeze(1)
         detections = torch.cat((boxes, conf, cls), dim=1)

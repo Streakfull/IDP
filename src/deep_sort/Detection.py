@@ -57,3 +57,6 @@ class Detection(object):
 
     def get_cls(self):
         return self.classif
+
+    def set_feature(self, feat):
+        self.feature = feat
