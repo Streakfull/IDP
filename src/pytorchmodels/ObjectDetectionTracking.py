@@ -20,7 +20,7 @@ class ObjectDetectionTracking(ObjectDetection):
         KalmanBoxTracker.count = 0
         cap = cv2.VideoCapture(video)
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-       # total_frames = 10
+        # total_frames = 10
         frame = 0
         mot_tracker = Sort(max_age=self.max_age,
                            min_hits=self.min_hits,
@@ -43,6 +43,7 @@ class ObjectDetectionTracking(ObjectDetection):
                     break
             cap.release()
             cv2.destroyAllWindows()
+        return mot_tracker.metrics
 
     def plot_boxes(self, results, img):
         for box in results:

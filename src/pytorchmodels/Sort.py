@@ -14,6 +14,13 @@ class Sort(object):
         self.trackers = []
         self.frame_count = 0
         self.tracker = Tracker()
+        self.metrics = {
+            "removed": 0,
+            "id_frames": {
+
+            },
+            "new_ids": 0
+        }
 
     def update(self, dets=np.empty((0, 6))):
         """
@@ -46,10 +53,16 @@ class Sort(object):
         # update matched trackers with assigned detections
         for m in matched:
             self.trackers[m[1]].update(dets[m[0], :])
+            matched_id = self.trackers[m[1]].id
+            if (matched_id in self.metrics["id_frames"]):
+                self.metrics["id_frames"][matched_id] += 1
+            else:
+                self.metrics["id_frames"][matched_id] = 1
 
         # create and initialise new trackers for unmatched detections
         for i in unmatched_dets:
             trk = KalmanBoxTracker(dets[i, :])
+            self.metrics["new_ids"] += 1
             self.trackers.append(trk)
         i = len(self.trackers)
         for trk in reversed(self.trackers):
@@ -61,6 +74,7 @@ class Sort(object):
             # remove dead tracklet
             if (trk.time_since_update > self.max_age):
                 self.trackers.pop(i)
+                self.metrics["removed"] += 1
 
         if (len(ret) > 0):
             return np.concatenate(ret)
