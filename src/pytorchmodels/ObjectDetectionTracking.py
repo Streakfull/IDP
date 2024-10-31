@@ -5,6 +5,7 @@ import cvzone
 from sort import *
 from tqdm.notebook import tqdm
 from pytorchmodels.Sort import Sort
+from pytorchmodels.KalmanBoxTracker import KalmanBoxTracker
 
 
 class ObjectDetectionTracking(ObjectDetection):
@@ -16,6 +17,7 @@ class ObjectDetectionTracking(ObjectDetection):
         self.iou_threshold = 0.3
 
     def process_video(self, video, write_path="./logs/outputLive/"):
+        KalmanBoxTracker.count = 0
         cap = cv2.VideoCapture(video)
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
        # total_frames = 10
