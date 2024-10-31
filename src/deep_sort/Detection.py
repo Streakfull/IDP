@@ -29,7 +29,8 @@ class Detection(object):
     def __init__(self, bb):
         x1, y1, x2, y2, conf, cls = bb
         w, h = x2-x1, y2-y1
-        self.tlwh = np.asarray([x1, y1, w, h], dtype=float)
+        self.tlwh = np.asarray([x1.cpu().numpy(), y1.cpu(
+        ).numpy(), w.cpu().numpy(), h.cpu().numpy()], dtype=float)
         self.confidence = float(conf)
         # self.feature = np.asarray(feature, dtype=np.float32)
         self.feature = np.ones(128)
@@ -59,4 +60,4 @@ class Detection(object):
         return self.classif
 
     def set_feature(self, feat):
-        self.feature = feat
+        self.feature = feat.cpu().numpy()

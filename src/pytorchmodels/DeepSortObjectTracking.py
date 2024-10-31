@@ -70,7 +70,7 @@ class DeepSortObjectTracking(ObjectDetection):
     def load_vgg(self):
         vgg16 = models.vgg16(pretrained=True)
         vgg16.eval()
-        vgg16_features = vgg16.features
+        vgg16_features = vgg16.features.to("cuda:0")
         return vgg16_features
 
     def load_embedding_model(self):
@@ -108,7 +108,7 @@ class DeepSortObjectTracking(ObjectDetection):
                     conf = track.get_detection().get_conf()
                     cls = track.get_detection().get_cls()
 
-                    cls = cls.numpy()
+                    cls = cls.cpu().numpy()
                     cls = np.array([cls])
                     conf = np.array([conf])
                     id = np.array([track.track_id])
@@ -147,8 +147,8 @@ class DeepSortObjectTracking(ObjectDetection):
     def get_detections_objects(self, det, frame):
         results = self.get_full_pred(det)
         # yolo_features = self.get_yolo_features(results, frame)
-        features = self.get_vgg_features(results, frame)
-        features_b = self.get_yolo_features(results, frame)
+        # features = self.get_vgg_features(results, frame)
+        features = self.get_yolo_features(results, frame)
         objects = list(map(Detection, results))
         for i in range(len(features)):
             feat = features[i]
@@ -182,6 +182,6 @@ class DeepSortObjectTracking(ObjectDetection):
 
         crop_t = torch.stack(crop_t)
         with torch.no_grad():
-            embeddings = self.vgg_extracor(crop_t)
+            embeddings = self.vgg_extracor(crop_t.to("cuda:0"))
             embeddings = embeddings.flatten(1)
         return embeddings
