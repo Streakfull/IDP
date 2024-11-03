@@ -48,14 +48,10 @@ def _cosine_distance(a, b, data_is_normalized=False):
         contains the squared distance between `a[i]` and `b[j]`.
 
     """
-
     if not data_is_normalized:
-        # vgg_src, vgg_trget = a[0], b[0]
-        # yolo_src, yolo_trget = a[1], b[1]
-        # import pdb
-        # pdb.set_trace()
         a = np.asarray(a) / np.linalg.norm(a, axis=1, keepdims=True)
         b = np.asarray(b) / np.linalg.norm(b, axis=1, keepdims=True)
+
     return 1. - np.dot(a, b.T)
 
 
@@ -98,8 +94,6 @@ def _nn_cosine_distance(x, y):
 
     """
     distances = _cosine_distance(x, y)
-    # import pdb
-    # pdb.set_trace()
     return distances.min(axis=0)
 
 
