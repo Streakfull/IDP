@@ -225,7 +225,6 @@ def get_object_features(feat_list, idxs):
 
     dim = [x.shape[1] for x in feat_list]
     s = reduce(gcd, dim)
-    # import pdb;pdb.set_trace()
     obj_feats = torch.cat([x.permute(0, 2, 3, 1).reshape(-1, s,
                           x.shape[1] // s).mean(dim=-1) for x in feat_list], dim=0)
     return obj_feats[idxs]

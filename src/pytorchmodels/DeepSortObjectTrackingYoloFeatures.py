@@ -40,11 +40,6 @@ class DeepSortObjectTrackingYoloFeatures(ObjectDetection):
         _ = self.model(ASSETS / "bus.jpg", save=False, embed=[16, 19, 22, 23])
         return model
 
-    # def load_embedding_model(self):
-    #     model = YOLO("yolo11n.pt")
-    #     model.fuse()
-    #     return model
-
     def predict(self, img):
         prepped = self.model.predictor.preprocess([img])
         result = self.model.predictor.inference(prepped)
@@ -60,8 +55,8 @@ class DeepSortObjectTrackingYoloFeatures(ObjectDetection):
 
     def process_video(self, video, write_path="./logs/outputLive/"):
         cap = cv2.VideoCapture(video)
-        # total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        total_frames = 10
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        # total_frames = 10
         frame = 0
         metric = nn_matching.NearestNeighborDistanceMetric(
             "cosine", self.max_cosine_distance, None)
@@ -76,6 +71,7 @@ class DeepSortObjectTrackingYoloFeatures(ObjectDetection):
 
                 detections = [
                     d for d in detections if d.confidence >= self.min_confidence]
+
                 tracker.predict()
                 tracker.update(detections)
                 results = []
