@@ -47,6 +47,14 @@ class Tracker:
         self.tracks = []
         self._next_id = 1
 
+        self.metrics = {
+            "removed": 0,
+            "id_frames": {
+
+            },
+            "new_ids": 0
+        }
+
     def predict(self):
         """Propagate track state distributions one time step forward.
 
@@ -72,10 +80,20 @@ class Tracker:
         for track_idx, detection_idx in matches:
             self.tracks[track_idx].update(
                 self.kf, detections[detection_idx])
+            matched_id = self.tracks[track_idx].track_id
+            if (matched_id in self.metrics["id_frames"]):
+                self.metrics["id_frames"][matched_id] += 1
+            else:
+                self.metrics["id_frames"][matched_id] = 1
+
         for track_idx in unmatched_tracks:
             self.tracks[track_idx].mark_missed()
         for detection_idx in unmatched_detections:
             self._initiate_track(detections[detection_idx])
+
+        for t in self.tracks:
+            if (t.is_deleted()):
+                self.metrics["removed"] += 1
         self.tracks = [t for t in self.tracks if not t.is_deleted()]
 
         # Update distance metric.
@@ -140,3 +158,4 @@ class Tracker:
             mean, covariance, self._next_id, self.n_init, self.max_age,
             detection.feature, detection))
         self._next_id += 1
+        self.metrics["new_ids"] += 1

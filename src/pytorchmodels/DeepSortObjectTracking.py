@@ -23,7 +23,23 @@ preprocess = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[
-                         0.229, 0.224, 0.225]),  # ImageNet normalization
+        0.229, 0.224, 0.225]),  # ImageNet normalization
+])
+
+preprocess_resnet = transforms.Compose([
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                         std=[0.229, 0.224, 0.225]),
+])
+
+
+preprocess_vit = transforms.Compose([
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
 ])
 
 
@@ -59,6 +75,8 @@ class DeepSortObjectTracking(ObjectDetection):
         self.frame_count = 0
         self.embedding_model = self.load_embedding_model()
         self.vgg_extracor = self.load_vgg()
+        self.resnet_extractor = self.load_resnet()
+        self.vit_extractor = self.load_vit()
         self.vgg_extracor.eval()
 
     # def load_model(self):
@@ -72,6 +90,19 @@ class DeepSortObjectTracking(ObjectDetection):
         vgg16.eval()
         vgg16_features = vgg16.features.to("cuda:0")
         return vgg16_features
+
+    def load_resnet(self):
+        resnet50 = models.resnet50(pretrained=True)
+        feature_extractor = nn.Sequential(*list(resnet50.children())[:-1])
+        resnet_features = feature_extractor.to("cuda:0")
+        return resnet_features
+
+    def load_vit(self):
+        model = models.vit_b_16(pretrained=True)
+        model.eval()  # Set to evaluation mode
+        model.heads = torch.nn.Identity()
+        model = model.to("cuda:0")
+        return model
 
     def load_embedding_model(self):
         model = YOLO("yolo11n.pt")
@@ -126,6 +157,7 @@ class DeepSortObjectTracking(ObjectDetection):
                     break
             cap.release()
             cv2.destroyAllWindows()
+        return tracker.metrics
 
     def plot_boxes(self, results, img):
         for box in results:
@@ -147,8 +179,10 @@ class DeepSortObjectTracking(ObjectDetection):
     def get_detections_objects(self, det, frame):
         results = self.get_full_pred(det)
         # yolo_features = self.get_yolo_features(results, frame)
-        # features = self.get_vgg_features(results, frame)
-        features = self.get_yolo_features(results, frame)
+        features = self.get_vgg_features(results, frame)
+        # features = self.get_yolo_features(results, frame)
+       # features = self.get_resnet_features(results, frame)
+        # features = self.get_vit_features(results, frame)
         objects = list(map(Detection, results))
         for i in range(len(features)):
             feat = features[i]
@@ -179,9 +213,46 @@ class DeepSortObjectTracking(ObjectDetection):
         crop_t = []
         for i in range(len(crop_objects)):
             crop_t.append(preprocess(crop_objects[i]))
-
+            # crop_t.append(crop_objects[i])
         crop_t = torch.stack(crop_t)
+        # import pdb
+        # pdb.set_trace()
+        crop_t = torch.tensor(crop_t)
         with torch.no_grad():
             embeddings = self.vgg_extracor(crop_t.to("cuda:0"))
+            embeddings = embeddings.flatten(1)
+        return embeddings
+
+    def get_resnet_features(self, res, frame):
+        crop_objects = self.get_crops(res, frame)
+        for i in range(len(crop_objects)):
+            crop_objects[i] = Image.fromarray(crop_objects[i])
+        crop_t = []
+        for i in range(len(crop_objects)):
+            crop_t.append(preprocess_resnet(crop_objects[i]))
+            # crop_t.append(crop_objects[i])
+        crop_t = torch.stack(crop_t)
+        # import pdb
+        # pdb.set_trace()
+        crop_t = torch.tensor(crop_t)
+        with torch.no_grad():
+            embeddings = self.resnet_extractor(crop_t.to("cuda:0"))
+            embeddings = embeddings.flatten(1)
+        return embeddings
+
+    def get_vit_features(self, res, frame):
+        crop_objects = self.get_crops(res, frame)
+        for i in range(len(crop_objects)):
+            crop_objects[i] = Image.fromarray(crop_objects[i])
+        crop_t = []
+        for i in range(len(crop_objects)):
+            crop_t.append(preprocess_resnet(crop_objects[i]))
+            # crop_t.append(crop_objects[i])
+        crop_t = torch.stack(crop_t)
+        # import pdb
+        # pdb.set_trace()
+        crop_t = torch.tensor(crop_t)
+        with torch.no_grad():
+            embeddings = self.vit_extractor(crop_t.to("cuda:0"))
             embeddings = embeddings.flatten(1)
         return embeddings
