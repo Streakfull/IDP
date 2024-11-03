@@ -1,8 +1,10 @@
+from types import MethodType
 import cv2
 import torch
 import cvzone
 from sort import *
 from tqdm.notebook import tqdm
+from ultralytics import YOLO
 
 
 class ObjectDetection(torch.nn.Module):
@@ -13,12 +15,14 @@ class ObjectDetection(torch.nn.Module):
         self.CLASS_NAMES_DICT = self.model.model.names
 
     def load_model(self):
-        model = torch.hub.load('ultralytics/yolov5',
-                               'yolov5n', pretrained=True)
+        model = YOLO("yolo11n.pt")
+        model.fuse()
         return model
 
     def predict(self, img):
         results = self.model(img)
+        # import pdb
+        # pdb.set_trace()
         return results
 
     def plot_boxes(self, results, img):
@@ -38,7 +42,8 @@ class ObjectDetection(torch.nn.Module):
 
     def process_video(self, video, write_path="./logs/outputLive/"):
         cap = cv2.VideoCapture(video)
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        # total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        total_frames = 10
         frame = 0
         with tqdm(total=total_frames-1, desc="Processing frames", unit="frame") as pbar:
             while True:
@@ -75,3 +80,15 @@ class ObjectDetection(torch.nn.Module):
                 pbar.update(1)
             cap.release()
             cv2.destroyAllWindows()
+
+    def get_full_pred(self, det):
+        try:
+            boxes = det[0].boxes.xyxy
+        except:
+            import pdb
+            pdb.set_trace()
+
+        cls = det[0].boxes.cls.unsqueeze(1)
+        conf = det[0].boxes.conf.unsqueeze(1)
+        detections = torch.cat((boxes, conf, cls), dim=1)
+        return detections
