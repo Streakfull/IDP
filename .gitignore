@@ -178,3 +178,4 @@ src/weights/*
 simpleGan
 v2logs
 *.pt
+notebooks/
