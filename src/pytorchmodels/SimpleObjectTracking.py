@@ -31,6 +31,7 @@ class SimpleObjectTracking(ObjectDetection):
         self.nn_budget = None
         self.write_path = write_path
         self.frame_count = 0
+        self.matched_indices = []
 
     def load_model(self):
         model = super().load_model()
@@ -68,12 +69,13 @@ class SimpleObjectTracking(ObjectDetection):
             while True:
                 _, img = cap.read()
                 det = self.predict(img)
-
+                tracker.set_frame(frame)
                 detections = self.get_detections_objects(det, img)
 
                 detections = [
                     d for d in detections if d.confidence >= self.min_confidence]
-                frame_tracks = tracker.update(detections)
+                frame_tracks, matched_indices = tracker.update(detections)
+                self.matched_indices.append(matched_indices)
                 results = []
                 for index, track in enumerate(frame_tracks):
                     bbox = track.get_detection().to_tlbr()

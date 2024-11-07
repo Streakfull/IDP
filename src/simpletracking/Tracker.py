@@ -2,6 +2,7 @@ import numpy as np
 from torch.nn.functional import cosine_similarity
 from simpletracking.Track import Track
 import torch
+from deep_sort.sk_learn_linear_assignment import linear_assignment
 
 
 class Tracker:
@@ -9,7 +10,7 @@ class Tracker:
         self.max_iou_distance = max_iou_distance
         self.max_age = max_age
         self.n_init = n_init
-
+        self.frame = 0
         self.tracks = []
         self._next_id = 1
 
@@ -24,11 +25,16 @@ class Tracker:
         targets = np.array([self.tracks[i].track_id for i in track_indices])
         cost_matrix = self.calc_cost_matrix(
             det_features=det_features, target_features=target_features)
-        print(cost_matrix.shape, cost_matrix)
+        matched_indices = self.match_detections_to_trackers(cost_matrix)
+        matched_detections = matched_indices[:, 1]
+        unmatched_detections = np.setdiff1d(
+            detection_indices, matched_detections)
         for unmatched_detection in unmatched_detections:
             self._initiate_track(dets[unmatched_detection])
 
-        return self.tracks
+        self.update_tracks(dets, matched_indices)
+
+        return self.tracks, matched_indices
 
     def calc_cost_matrix(self, det_features, target_features):
         cost_matrix = torch.zeros((len(target_features), len(det_features)))
@@ -41,3 +47,15 @@ class Tracker:
         self.tracks.append(Track(
             self._next_id, detection))
         self._next_id += 1
+
+    def match_detections_to_trackers(self, cost_matrix):
+        matched_indices = linear_assignment(cost_matrix)
+        return matched_indices
+
+    def set_frame(self, frame):
+        self.frame = frame
+
+    def update_tracks(self, dets, matched_indices):
+        for idx in matched_indices:
+            track_idx, det_idx = idx
+            self.tracks[track_idx].set_detection(dets[det_idx])

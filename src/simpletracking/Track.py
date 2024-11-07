@@ -9,3 +9,6 @@ class Track:
 
     def get_id(self):
         return self.track_id
+
+    def set_detection(self, detection):
+        self.detection = detection
