@@ -86,20 +86,26 @@ class DeepSortObjectTrackingYoloFeatures(ObjectDetection):
                     cv2.destroyAllWindows()
                     break
 
-    def process_video(self, video, write_path="./logs/outputLive/", labels_write_path=None, max_frames=None, frame_difference_write_path=None):
+    def process_video(self, video, write_path="./logs/outputLive/", labels_write_path=None, max_frames=None, frame_difference_write_path=None, start_frame=None, write_directly=True):
         cap = cv2.VideoCapture(video)
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         if (max_frames is not None):
             total_frames = max_frames
         frame = 0
+        self.frame_count = 0
         metric = nn_matching.NearestNeighborDistanceMetric(
             "cosine", self.max_cosine_distance, None)
         tracker = Tracker(metric)
         stored_metrics = copy.deepcopy(tracker.metrics)
         all_frames_diff = {}
-       # results = []
+        plotted_frames = []
         with tqdm(total=total_frames-1, desc="Processing frames", unit="frame") as pbar:
             while True:
+                if (frame < start_frame):
+                    frame += 1
+                    self.frame_count += 1
+                    continue
+
                 _, img = cap.read()
                 det = self.predict(img)
 
@@ -138,8 +144,11 @@ class DeepSortObjectTrackingYoloFeatures(ObjectDetection):
                     if (frame_diff is not None):
                         all_frames_diff[frame] = frame_diff
                         write_json(
-                            all_frames_diff,  f"{frame_difference_write_path}/frame_diff.json",)
-                cv2.imwrite(f"{write_path}/{frame_name}.jpg", frames)
+                            all_frames_diff,  f"{frame_difference_write_path}/frame_diff.json")
+                if write_directly:
+                    cv2.imwrite(f"{write_path}/{frame_name}.jpg", frames)
+                else:
+                    plotted_frames.append(frames)
                 frame += 1
                 self.frame_count += 1
                 stored_metrics = copy.deepcopy(tracker.metrics)
@@ -150,7 +159,7 @@ class DeepSortObjectTrackingYoloFeatures(ObjectDetection):
                     break
             cap.release()
             cv2.destroyAllWindows()
-        return tracker.metrics
+        return plotted_frames
 
     def plot_boxes(self, results, img):
         for box in results:

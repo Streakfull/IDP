@@ -25,3 +25,17 @@ def write_tensor_text(tensor, path):
 def write_json(data, path):
     with open(path, 'w') as file:
         json.dump(data, file, indent=4)
+
+
+def create_directory(path):
+    # Create the directory if it doesn't exist
+    os.makedirs(path, exist_ok=True)
+    # print(f"Directory '{path}' created or already exists.")
+
+
+def write_tuple_file(path, data):
+    with open(path, "w") as f:
+        for integer, arr in data:
+            # Convert array to space-separated string and write to file
+            arr_str = " ".join(map(str, arr))
+            f.write(f"{integer}, [{arr_str}]\n")

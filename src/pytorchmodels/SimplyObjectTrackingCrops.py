@@ -22,7 +22,7 @@ from ultralytics.utils.ops import xywh2xyxy, scale_boxes
 from ultralytics.engine.results import Results
 
 
-class SimpleObjectTracking(ObjectDetection):
+class SimpleObjectTrackingCrops(ObjectDetection):
 
     def __init__(self, capture, write_path) -> None:
         super().__init__(capture)
@@ -32,12 +32,18 @@ class SimpleObjectTracking(ObjectDetection):
         self.write_path = write_path
         self.frame_count = 0
         self.matched_indices = []
+        self.embedding_model = self.load_embedding_model()
 
     def load_model(self):
         model = super().load_model()
         self.model = model
         self.model.model._predict_once = MethodType(_predict_once, model.model)
         _ = self.model(ASSETS / "bus.jpg", save=False, embed=[16, 19, 22, 23])
+        return model
+
+    def load_embedding_model(self):
+        model = YOLO("yolo11n.pt")
+        model.fuse()
         return model
 
     def predict(self, img):
@@ -57,25 +63,17 @@ class SimpleObjectTracking(ObjectDetection):
         # pdb.set_trace()
         return result
 
-    def process_video(self, video, write_path="./logs/outputLive/", labels_write_path=None, max_frames=None, frame_difference_write_path=None, start_frame=None, write_directly=True):
+    def process_video(self, video, write_path="./logs/outputLive/", labels_write_path=None, max_frames=None, frame_difference_write_path=None):
         cap = cv2.VideoCapture(video)
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         if (max_frames is not None):
             total_frames = max_frames
         frame = 0
-        self.frame_count = 0
         all_frames_diff = {}
         tracker = Tracker()
-        plotted_frames = []
-        frame_labels = []
         with tqdm(total=total_frames-1, desc="Processing frames", unit="frame") as pbar:
             while True:
                 _, img = cap.read()
-                if (frame < start_frame):
-                    frame += 1
-                    self.frame_count += 1
-                    pbar.update(1)
-                    continue
                 det = self.predict(img)
                 tracker.set_frame(frame)
                 detections = self.get_detections_objects(det, img)
@@ -98,16 +96,13 @@ class SimpleObjectTracking(ObjectDetection):
                     results.append(result)
                 frames = self.plot_boxes(results, img)
                 frame_name = f"frame_{frame}"
-                frame_labels.append(results)
                 if (labels_write_path is not None):
                     fmt = ['%.4f'] * (result.shape[0] - 1) + \
                         ['%d'] if len(results) > 0 else '%d'
                     np.savetxt(f"{labels_write_path}/{frame_name}.txt",
                                results, delimiter=' ', fmt=fmt)
-                if write_directly:
-                    cv2.imwrite(f"{write_path}/{frame_name}.jpg", frames)
-                else:
-                    plotted_frames.append(frames)
+
+                cv2.imwrite(f"{write_path}/{frame_name}.jpg", frames)
                 frame += 1
                 self.frame_count += 1
                 pbar.update(1)
@@ -117,7 +112,6 @@ class SimpleObjectTracking(ObjectDetection):
                     break
             cap.release()
             cv2.destroyAllWindows()
-        return plotted_frames, frame_labels
 
     def plot_boxes(self, results, img):
         for box in results:
@@ -139,7 +133,8 @@ class SimpleObjectTracking(ObjectDetection):
 
     def get_detections_objects(self, det, frame):
         results = self.get_full_pred(det)
-        features = det.feats
+        # features = det.feats
+        features = self.get_yolo_features(det, frame)
         objects = list(map(Detection, results))
         for i in range(len(features)):
             feat = features[i]
@@ -149,7 +144,7 @@ class SimpleObjectTracking(ObjectDetection):
 
     def get_crops(self, res, frame):
         crop_objects = []
-        for box in res:
+        for box in res.boxes.xyxy:
             crop_obj = frame[int(box[1]): int(
                 box[3]), int(box[0]): int(box[2])]
             crop_objects.append(crop_obj)
@@ -166,3 +161,11 @@ class SimpleObjectTracking(ObjectDetection):
         conf = det.boxes.conf.unsqueeze(1)
         detections = torch.cat((boxes, conf, cls), dim=1)
         return detections
+
+    def get_yolo_features(self, res, frame):
+        crop_objects = self.get_crops(res, frame)
+        embeddings = self.embedding_model.embed(crop_objects)
+        # embeddings = self.embedding_model.embed(frame)
+       # import pdb
+        # pdb.set_trace()
+        return embeddings

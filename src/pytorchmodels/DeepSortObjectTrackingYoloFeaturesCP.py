@@ -7,8 +7,10 @@ import torch
 import cvzone
 from sort import *
 from tqdm.notebook import tqdm
-from simpletracking.Detection import Detection
-from simpletracking.Tracker import Tracker
+from deep_sort.Detection import Detection
+from deep_sort.tracker import Tracker
+from deep_sort import nn_matching
+from deep_sort.nms import non_max_suppression
 import numpy as np
 import uuid
 import torch
@@ -20,9 +22,10 @@ from lutils.yollov11_features import _predict_once, non_max_suppression, get_obj
 from lutils.general import write_json
 from ultralytics.utils.ops import xywh2xyxy, scale_boxes
 from ultralytics.engine.results import Results
+import copy
 
 
-class SimpleObjectTracking(ObjectDetection):
+class DeepSortObjectTrackingYoloFeatures(ObjectDetection):
 
     def __init__(self, capture, write_path) -> None:
         super().__init__(capture)
@@ -31,7 +34,6 @@ class SimpleObjectTracking(ObjectDetection):
         self.nn_budget = None
         self.write_path = write_path
         self.frame_count = 0
-        self.matched_indices = []
 
     def load_model(self):
         model = super().load_model()
@@ -57,17 +59,48 @@ class SimpleObjectTracking(ObjectDetection):
         # pdb.set_trace()
         return result
 
-    def process_video(self, video, write_path="./logs/outputLive/", labels_write_path=None, max_frames=None, frame_difference_write_path=None, start_frame=None, write_directly=True):
+    def plot_benchmark(self, video, write_path=None, labels_path=None, max_frames=None, start_frame=None):
+        cap = cv2.VideoCapture(video)
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        if (max_frames is not None):
+            total_frames = max_frames
+        frame = 0
+        if (start_frame is not None):
+            if (max_frames is not None):
+                total_frames += start_frame
+        with tqdm(total=total_frames-1, desc="Processing frames", unit="frame") as pbar:
+            while True:
+                _, img = cap.read()
+                if (start_frame is not None and frame < start_frame):
+                    frame += 1
+                    pbar.update(1)
+                    continue
+
+                labels = np.loadtxt(f"{labels_path}/frame_{frame}.txt")
+                frames = self.plot_boxes(labels, img)
+                cv2.imwrite(f"{write_path}/frame_{frame}.jpg", frames)
+                frame += 1
+                pbar.update(1)
+                if frame >= total_frames:
+                    cap.release()
+                    cv2.destroyAllWindows()
+                    break
+
+    def process_video(self, video, write_path="./logs/outputLive/", labels_write_path=None, max_frames=None, frame_difference_write_path=None, start_frame=None, write_directly=True, print_cost_matrix=True):
         cap = cv2.VideoCapture(video)
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         if (max_frames is not None):
             total_frames = max_frames
         frame = 0
         self.frame_count = 0
+        metric = nn_matching.NearestNeighborDistanceMetric(
+            "cosine", self.max_cosine_distance, None)
+        tracker = Tracker(metric, print_cost_matrix=print_cost_matrix)
+        stored_metrics = copy.deepcopy(tracker.metrics)
         all_frames_diff = {}
-        tracker = Tracker()
         plotted_frames = []
         frame_labels = []
+        features = []
         with tqdm(total=total_frames-1, desc="Processing frames", unit="frame") as pbar:
             while True:
                 _, img = cap.read()
@@ -76,40 +109,57 @@ class SimpleObjectTracking(ObjectDetection):
                     self.frame_count += 1
                     pbar.update(1)
                     continue
+
                 det = self.predict(img)
-                tracker.set_frame(frame)
+
                 detections = self.get_detections_objects(det, img)
 
                 detections = [
                     d for d in detections if d.confidence >= self.min_confidence]
-                frame_tracks, matched_indices = tracker.update(detections)
-                self.matched_indices.append(matched_indices)
+
+                tracker.predict()
+                tracker.update(detections)
                 results = []
-                for index, track in enumerate(frame_tracks):
-                    bbox = track.get_detection().to_tlbr()
+                tracks_feat = []
+                for track in tracker.tracks:
+                    if (not track.is_confirmed() or track.time_since_update > 1) and (frame > tracker.n_init):
+                        continue
+
+                    bbox = track.to_tlbr()
                     conf = track.get_detection().get_conf()
                     cls = track.get_detection().get_cls()
 
                     cls = cls.cpu().numpy()
                     cls = np.array([cls])
                     conf = np.array([conf])
-                    id = np.array([track.get_id()])
+                    id = np.array([track.track_id])
                     result = np.concatenate((bbox, conf, cls, id))
+                    tracks_feat.append(
+                        (int(id), track.get_detection().get_feature()))
                     results.append(result)
                 frames = self.plot_boxes(results, img)
                 frame_name = f"frame_{frame}"
                 frame_labels.append(results)
+                features.append(tracks_feat)
                 if (labels_write_path is not None):
-                    fmt = ['%.4f'] * (result.shape[0] - 1) + \
+                    fmt = ['%.4f'] * (result.shape[0] - 1) +\
                         ['%d'] if len(results) > 0 else '%d'
                     np.savetxt(f"{labels_write_path}/{frame_name}.txt",
                                results, delimiter=' ', fmt=fmt)
+
+                    frame_diff = self.get_frame_diff(
+                        stored_metrics, tracker.metrics)
+                    if (frame_diff is not None):
+                        all_frames_diff[frame] = frame_diff
+                        write_json(
+                            all_frames_diff,  f"{frame_difference_write_path}/frame_diff.json")
                 if write_directly:
                     cv2.imwrite(f"{write_path}/{frame_name}.jpg", frames)
                 else:
                     plotted_frames.append(frames)
                 frame += 1
                 self.frame_count += 1
+                stored_metrics = copy.deepcopy(tracker.metrics)
                 pbar.update(1)
                 if (cv2.waitKey(1) == ord('q')):
                     break
@@ -117,7 +167,8 @@ class SimpleObjectTracking(ObjectDetection):
                     break
             cap.release()
             cv2.destroyAllWindows()
-        return plotted_frames, frame_labels
+        return plotted_frames, frame_labels, features
+        # return tracker.metrics
 
     def plot_boxes(self, results, img):
         for box in results:
@@ -166,3 +217,31 @@ class SimpleObjectTracking(ObjectDetection):
         conf = det.boxes.conf.unsqueeze(1)
         detections = torch.cat((boxes, conf, cls), dim=1)
         return detections
+
+    def get_frame_diff(self, stored_metrics, new_metrics):
+        # Removed
+        some_removed = False
+        some_added = False
+        removed = []
+        added_ids = []
+        if (stored_metrics['removed'] != new_metrics['removed']):
+            some_removed = True
+            new_ids = new_metrics['id_frames'].keys()
+            for new_id in new_ids:
+                if new_id in stored_metrics['id_frames'] and stored_metrics['id_frames'][new_id] == new_metrics['id_frames'][new_id]:
+                    removed.append(new_id)
+
+        if (stored_metrics['new_ids'] != new_metrics['new_ids']):
+            some_added = True
+            new_ids = new_metrics['id_frames'].keys()
+            for new_id in new_ids:
+                if new_id not in stored_metrics['id_frames']:
+                    added_ids.append(new_id)
+
+        if (some_removed or some_added):
+            return {
+                "removed": removed,
+                "new_ids": added_ids
+            }
+
+        return None

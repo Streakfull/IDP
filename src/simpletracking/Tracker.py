@@ -22,9 +22,10 @@ class Tracker:
                                 for i in detection_indices])
         target_features = np.array([self.tracks[i].get_detection().get_feature()
                                    for i in track_indices])
-        targets = np.array([self.tracks[i].track_id for i in track_indices])
+
         cost_matrix = self.calc_cost_matrix(
             det_features=det_features, target_features=target_features)
+        print("Cost matrix for frame ", self.frame, cost_matrix)
         matched_indices = self.match_detections_to_trackers(cost_matrix)
         matched_detections = matched_indices[:, 1]
         unmatched_detections = np.setdiff1d(

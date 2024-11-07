@@ -37,11 +37,12 @@ class Tracker:
 
     """
 
-    def __init__(self, metric, max_iou_distance=0.7, max_age=500, n_init=3):
+    def __init__(self, metric, max_iou_distance=0.7, max_age=30, n_init=3, print_cost_matrix=False):
         self.metric = metric
         self.max_iou_distance = max_iou_distance
         self.max_age = max_age
         self.n_init = n_init
+        self.print_cost_matrix = print_cost_matrix
 
         self.kf = kalman_filter.KalmanFilter()
         self.tracks = []
@@ -116,11 +117,12 @@ class Tracker:
             targets = np.array([tracks[i].track_id for i in track_indices])
             # features = [dets[i].feature for i in detection_indices]
             # targets = [tracks[i].track_id for i in track_indices]
-
             cost_matrix = self.metric.distance(features, targets)
             cost_matrix = linear_assignment.gate_cost_matrix(
                 self.kf, cost_matrix, tracks, dets, track_indices,
                 detection_indices)
+            if (self.print_cost_matrix):
+                print("Cost Matrix:", cost_matrix)
 
             return cost_matrix
 
@@ -131,10 +133,12 @@ class Tracker:
             i for i, t in enumerate(self.tracks) if not t.is_confirmed()]
 
         # Associate confirmed tracks using appearance features.
+        # print(confirmed_tracks, "SELF.TRACKS?? CONFIRMED", self.n_init, "OK?")
         matches_a, unmatched_tracks_a, unmatched_detections = \
             linear_assignment.matching_cascade(
                 gated_metric, self.metric.matching_threshold, self.max_age,
                 self.tracks, detections, confirmed_tracks)
+        # print(matches_a, "SKIP CONFIRMED")
 
         # Associate remaining tracks together with unconfirmed tracks using IOU.
         iou_track_candidates = unconfirmed_tracks + [
@@ -147,8 +151,15 @@ class Tracker:
             linear_assignment.min_cost_matching(
                 iou_matching.iou_cost, self.max_iou_distance, self.tracks,
                 detections, iou_track_candidates, unmatched_detections)
-
         matches = matches_a + matches_b
+        print("Appearance Matches:", len(matches_a),
+              "IOU Matches: ", len(matches_b))
+        # For loggging Appearance tracks Ids:
+        matched_track_ids = []
+        for element in matches_a:
+            track_idx = element[0]
+            matched_track_ids.append(self.tracks[track_idx].track_id)
+        print("Appeance Matched IDs: ", [matched_track_ids])
         unmatched_tracks = list(set(unmatched_tracks_a + unmatched_tracks_b))
         return matches, unmatched_tracks, unmatched_detections
 
