@@ -61,3 +61,9 @@ class Detection(object):
 
     def set_feature(self, feat):
         self.feature = feat.cpu().numpy()
+
+    def get_feature(self):
+        return self.feature
+
+    def to_tlwh(self):
+        return self.tlwh

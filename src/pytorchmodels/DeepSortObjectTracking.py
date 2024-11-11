@@ -111,8 +111,8 @@ class DeepSortObjectTracking(ObjectDetection):
 
     def process_video(self, video, write_path="./logs/outputLive/"):
         cap = cv2.VideoCapture(video)
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        # total_frames = 10
+        # total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        total_frames = 2
         frame = 0
         metric = nn_matching.NearestNeighborDistanceMetric(
             "cosine", self.max_cosine_distance, None)
@@ -179,9 +179,9 @@ class DeepSortObjectTracking(ObjectDetection):
     def get_detections_objects(self, det, frame):
         results = self.get_full_pred(det)
         # yolo_features = self.get_yolo_features(results, frame)
-        features = self.get_vgg_features(results, frame)
-        # features = self.get_yolo_features(results, frame)
-       # features = self.get_resnet_features(results, frame)
+        # features = self.get_vgg_features(results, frame)
+        features = self.get_yolo_features(results, frame)
+        # features = self.get_resnet_features(results, frame)
         # features = self.get_vit_features(results, frame)
         objects = list(map(Detection, results))
         for i in range(len(features)):
@@ -202,9 +202,14 @@ class DeepSortObjectTracking(ObjectDetection):
 
     def get_yolo_features(self, res, frame):
         crop_objects = self.get_crops(res, frame)
-        embeddings = self.embedding_model.embed(crop_objects)
 
-        return embeddings
+        # embeddings = self.embedding_model.embed(crop_objects)
+        # embeddings = self.embedding_model.embed(frame)
+        embeddings = self.embedding_model(frame)
+        import pdb
+        pdb.set_trace()
+        # return embeddings
+        return []
 
     def get_vgg_features(self, res, frame):
         crop_objects = self.get_crops(res, frame)
