@@ -71,7 +71,7 @@ class SimpleObjectTracking(ObjectDetection):
         with tqdm(total=total_frames-1, desc="Processing frames", unit="frame") as pbar:
             while True:
                 _, img = cap.read()
-                if (frame < start_frame):
+                if (start_frame is not None and frame < start_frame):
                     frame += 1
                     self.frame_count += 1
                     pbar.update(1)

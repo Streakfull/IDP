@@ -152,8 +152,6 @@ class Tracker:
                 iou_matching.iou_cost, self.max_iou_distance, self.tracks,
                 detections, iou_track_candidates, unmatched_detections)
         matches = matches_a + matches_b
-        print("Appearance Matches:", len(matches_a),
-              "IOU Matches: ", len(matches_b))
         # For loggging Appearance tracks Ids:
         matched_track_ids = []
         for element in matches_a:

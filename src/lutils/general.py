@@ -1,3 +1,4 @@
+from IPython.display import display
 import os
 import random
 import numpy as np
@@ -39,3 +40,17 @@ def write_tuple_file(path, data):
             # Convert array to space-separated string and write to file
             arr_str = " ".join(map(str, arr))
             f.write(f"{integer}, [{arr_str}]\n")
+
+
+def show_image(image_path):
+    """
+    Display an image in a Jupyter notebook.
+
+    Parameters:
+    - image_path (str): The file path to the image you want to display.
+    """
+    # Load the image file
+    image = Image.open(image_path)
+
+    # Display the image in the notebook
+    display(image)

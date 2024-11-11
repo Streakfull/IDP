@@ -86,7 +86,14 @@ class DeepSortObjectTrackingYoloFeatures(ObjectDetection):
                     cv2.destroyAllWindows()
                     break
 
-    def process_video(self, video, write_path="./logs/outputLive/", labels_write_path=None, max_frames=None, frame_difference_write_path=None, start_frame=None, write_directly=True, print_cost_matrix=True):
+    def process_video(self, video,
+                      write_path="./logs/outputLive/",
+                      labels_write_path=None, max_frames=None,
+                      frame_difference_write_path=None, start_frame=None,
+                      write_directly=True,
+                      print_cost_matrix=True,
+                      max_age=30
+                      ):
         cap = cv2.VideoCapture(video)
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         if (max_frames is not None):
@@ -95,7 +102,8 @@ class DeepSortObjectTrackingYoloFeatures(ObjectDetection):
         self.frame_count = 0
         metric = nn_matching.NearestNeighborDistanceMetric(
             "cosine", self.max_cosine_distance, None)
-        tracker = Tracker(metric, print_cost_matrix=print_cost_matrix)
+        tracker = Tracker(
+            metric, print_cost_matrix=print_cost_matrix, max_age=max_age)
         stored_metrics = copy.deepcopy(tracker.metrics)
         all_frames_diff = {}
         plotted_frames = []
@@ -104,7 +112,7 @@ class DeepSortObjectTrackingYoloFeatures(ObjectDetection):
         with tqdm(total=total_frames-1, desc="Processing frames", unit="frame") as pbar:
             while True:
                 _, img = cap.read()
-                if (frame < start_frame):
+                if (start_frame is not None and frame < start_frame):
                     frame += 1
                     self.frame_count += 1
                     pbar.update(1)
@@ -147,12 +155,12 @@ class DeepSortObjectTrackingYoloFeatures(ObjectDetection):
                     np.savetxt(f"{labels_write_path}/{frame_name}.txt",
                                results, delimiter=' ', fmt=fmt)
 
-                    frame_diff = self.get_frame_diff(
-                        stored_metrics, tracker.metrics)
-                    if (frame_diff is not None):
-                        all_frames_diff[frame] = frame_diff
-                        write_json(
-                            all_frames_diff,  f"{frame_difference_write_path}/frame_diff.json")
+                    # frame_diff = self.get_frame_diff(
+                    #     stored_metrics, tracker.metrics)
+                    # if (frame_diff is not None):
+                    #     all_frames_diff[frame] = frame_diff
+                    #     write_json(
+                    #         all_frames_diff,  f"{frame_difference_write_path}/frame_diff.json")
                 if write_directly:
                     cv2.imwrite(f"{write_path}/{frame_name}.jpg", frames)
                 else:
@@ -163,7 +171,7 @@ class DeepSortObjectTrackingYoloFeatures(ObjectDetection):
                 pbar.update(1)
                 if (cv2.waitKey(1) == ord('q')):
                     break
-                if frame == total_frames:
+                if frame >= total_frames:
                     break
             cap.release()
             cv2.destroyAllWindows()

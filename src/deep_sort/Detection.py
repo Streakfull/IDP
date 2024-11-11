@@ -64,3 +64,6 @@ class Detection(object):
 
     def get_feature(self):
         return self.feature
+
+    def to_tlwh(self):
+        return self.tlwh
