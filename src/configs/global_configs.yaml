@@ -1,0 +1,41 @@
+training:
+  name: vis
+  description: Debug
+  experiment_id: debug
+  extra_notes: none
+  logs_dir: sceneLogs
+  is_train: true
+  device: cpu
+  batch_size: 16
+  num_workers: 16
+  test_size: 0.1
+  n_epochs: 50000
+  append_loss_every: 250
+  print_every: 500
+  validate_every: 3330
+  save_every: 3330
+  save_every_nepochs: 10
+  start_epoch: 0
+  start_iteration: 0
+  visualize_every: 500
+  apply_metrics_every: 2033
+  use_scheduler: True
+  apply_metrics_batch_count: 5 # number of batches to apply additional metrics on
+  load_ckpt: False
+  ckpt_path: logs/fullTrain/fullTrain4Continue/2024_08_08_14_33_28/checkpoints/epoch-latest.ckpt
+
+dataset:
+  dataset_field: sim_matches
+  path: ./datasets/SimMatches.py  # For local testing without downloading shape => change to local_raw_dataset/ShapeNet
+    # Can be overriden by dataset specific path
+  overfit_size: 5
+  split: train # train | valid | test
+  is_overfit: False
+
+  sim_matches:
+    path: ./datasets/SimMatches.py 
+    class: SimMatches
+
+
+model:
+  model_field: fasafs
