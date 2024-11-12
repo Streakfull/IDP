@@ -11,30 +11,46 @@ class SiameseNetwork(nn.Module):
 
         self.backbone = nn.Sequential(
             nn.Linear(in_features=64, out_features=128),
+            nn.BatchNorm1d(128),
             nn.ReLU(inplace=True),
+
             nn.Linear(in_features=128, out_features=256),
+            nn.BatchNorm1d(256),
             nn.ReLU(inplace=True),
+
             nn.Linear(in_features=256, out_features=512),
+            nn.BatchNorm1d(512),
             nn.ReLU(inplace=True),
+
             nn.Linear(in_features=512, out_features=1024),
+            nn.BatchNorm1d(1024),
             nn.ReLU(inplace=True),
+
             nn.Linear(in_features=1024, out_features=2048),
+            nn.BatchNorm1d(2048),
             nn.ReLU(inplace=True),
+
+
             nn.Linear(in_features=2048, out_features=4096),
+            nn.BatchNorm1d(4096),
         )
 
         self.comb = nn.Sequential(
             nn.Conv2d(in_channels=2, out_channels=128,
                       kernel_size=1, padding=0),
+            nn.BatchNorm2d(128),
             nn.ReLU(inplace=True),
             nn.Conv2d(in_channels=128, out_channels=256,
                       kernel_size=3, padding=1),
+            nn.BatchNorm2d(256),
             nn.ReLU(inplace=True),
             nn.Conv2d(in_channels=256, out_channels=128,
                       kernel_size=3, padding=1),
+            nn.BatchNorm2d(128),
             nn.ReLU(inplace=True),
             nn.Conv2d(in_channels=128, out_channels=64,
                       kernel_size=3, padding=1),
+            nn.BatchNorm2d(64),
             nn.ReLU(),
             nn.Conv2d(in_channels=64, out_channels=1,
                       kernel_size=3, padding=1),

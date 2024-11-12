@@ -32,15 +32,15 @@ class Siamese(BaseModel):
     def forward(self, x):
         self.x1, self.x2, self.pred = self.network.forward(x)
         self.target = x["label"]
+        return self.x1, self.x2, self.pred
 
     def set_loss(self):
 
         self.bce = self.bce_loss(self.pred,
                                  self.target.unsqueeze(1).float())
 
-        self.cont = self.contrastive_loss(self.x1, self.x2, self.target)
-        import pdb
-        pdb.set_trace()
+        self.cont, self.cos_distance = self.contrastive_loss(
+            self.x1, self.x2, self.target)
         self.loss = self.bce + self.cont
 
     def backward(self):
@@ -55,12 +55,16 @@ class Siamese(BaseModel):
         self.optimizer.step()
 
     def get_metrics(self):
-        return {'loss': self.loss.data, 'acc': self.accuracy(), "bce": self.bce, "cont": self.cont}
+        cos_p = self.cos_distance[self.target == 1]
+        cos_n = self.cos_distance[self.target == 0]
+        return {'loss': self.loss.data, 'acc': self.accuracy(), "bce": self.bce, "cont": self.cont, "cosp": cos_p.mean(), "cosn": cos_n.mean()}
 
     def accuracy(self):
-        predictions = nn.functional.sigmoid(self.predictions.detach())
-        predictions = torch.argmax(predictions, dim=1)
-        total_correct = predictions == self.target
+        predictions = nn.functional.sigmoid(self.pred.detach())
+
+        predictions[predictions >= 0.5] = 1
+        predictions[predictions < 0.5] = 0
+        total_correct = predictions == self.target.unsqueeze(1)
         acc = total_correct.sum()/predictions.shape[0]
         return acc
 
