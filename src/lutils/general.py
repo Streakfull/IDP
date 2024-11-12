@@ -17,6 +17,13 @@ def seed_all(seed):
     torch.backends.cudnn.benchmark = True
 
 
+class NumpyArrayEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
+
+
 def write_tensor_text(tensor, path):
     with open(path, 'w') as f:
         for row in tensor:
@@ -25,7 +32,7 @@ def write_tensor_text(tensor, path):
 
 def write_json(data, path):
     with open(path, 'w') as file:
-        json.dump(data, file, indent=4)
+        json.dump(data, file, indent=4, cls=NumpyArrayEncoder)
 
 
 def create_directory(path):
