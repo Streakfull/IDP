@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from PIL import Image
 import json
+from cprint import *
 
 
 def seed_all(seed):
@@ -61,3 +62,11 @@ def show_image(image_path):
 
     # Display the image in the notebook
     display(image)
+
+
+def mkdir(path):
+    if not os.path.exists(path):
+        cprint.warn(f"- Creating new directory {path}")
+        os.makedirs(path)
+        return
+    cprint.ok(f"- {path} directory found")

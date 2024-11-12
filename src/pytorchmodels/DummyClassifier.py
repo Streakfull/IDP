@@ -1,6 +1,6 @@
-from src.models.base_model import BaseModel
-from src.blocks.dummy_network import DummyNetwork
-from src.losses.build_loss import BuildLoss
+from pytorchmodels.base_model import BaseModel
+from blocks.dummy_network import DummyNetwork
+from losses.build_loss import BuildLoss
 from torch import nn, optim
 import torch
 
@@ -15,10 +15,17 @@ class DummyClassifier(BaseModel):
         self.scheduler = optim.lr_scheduler.StepLR(
             self.optimizer, step_size=configs["scheduler_step_size"], gamma=configs["scheduler_gamma"])
         self.softmax = nn.Softmax(dim=1)
+        self.configs = {
+
+            "metrics": "None"
+        }
 
     def forward(self, x):
+        if (not isinstance(x, dict)):
+            x = self.network(x)
+            return x
         self.target = x["label"]
-        x = self.network(x["voxels"])
+        x = self.network(x["x1"])
         self.predictions = x
         return x
 
@@ -42,4 +49,11 @@ class DummyClassifier(BaseModel):
         return pred
 
     def get_metrics(self):
-        return {'loss': self.loss.data}
+        return {'loss': self.loss.data, 'acc': self.accuracy()}
+
+    def accuracy(self):
+        predictions = nn.functional.softmax(self.predictions.detach())
+        predictions = torch.argmax(predictions, dim=1)
+        total_correct = predictions == self.target
+        acc = total_correct.sum()/predictions.shape[0]
+        return acc

@@ -1,41 +1,66 @@
 training:
-  name: vis
+  name: debug
   description: Debug
   experiment_id: debug
   extra_notes: none
-  logs_dir: sceneLogs
+  logs_dir: ../logs/debug
   is_train: true
-  device: cpu
+  device: cuda:0
   batch_size: 16
   num_workers: 16
   test_size: 0.1
-  n_epochs: 50000
+  n_epochs: 1000
   append_loss_every: 250
-  print_every: 500
+  print_every: 50
   validate_every: 3330
   save_every: 3330
-  save_every_nepochs: 10
+  save_every_nepochs: 100000000000000000000000000
   start_epoch: 0
   start_iteration: 0
   visualize_every: 500
   apply_metrics_every: 2033
-  use_scheduler: True
+  use_scheduler: False
   apply_metrics_batch_count: 5 # number of batches to apply additional metrics on
   load_ckpt: False
   ckpt_path: logs/fullTrain/fullTrain4Continue/2024_08_08_14_33_28/checkpoints/epoch-latest.ckpt
 
 dataset:
   dataset_field: sim_matches
-  path: ./datasets/SimMatches.py  # For local testing without downloading shape => change to local_raw_dataset/ShapeNet
-    # Can be overriden by dataset specific path
+  path: None
   overfit_size: 5
   split: train # train | valid | test
-  is_overfit: False
+  is_overfit: True
 
   sim_matches:
-    path: ./datasets/SimMatches.py 
+    class_filepath: ./datasets/SimMatches.py 
     class: SimMatches
+    path: ./raw_dataset/match_pairs/random_samples_30k
 
 
 model:
-  model_field: fasafs
+  model_field: siamese
+  
+  dummy_classifier:
+    model_filepath: ./pytorchmodels/DummyClassifier.py
+    model_class: DummyClassifier
+    lr: 0.01
+    losses: acc
+    weight_init: None 
+    criterion: CE
+    scheduler_step_size: 25
+    scheduler_gamma: 0.5
+    dummy_network:
+      kernel_size: 3
+      padding: 1
+
+  siamese:
+    model_filepath: ./pytorchmodels/Siamese.py
+    model_class: Siamese
+    metrics: None
+    lr: 1.0e-3
+    losses: acc,cnt,bce
+    weight_init: None
+    scheduler_step_size: 25
+    scheduler_gamma: 0.5
+
+
