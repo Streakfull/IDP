@@ -64,7 +64,7 @@ class Track:
     """
 
     def __init__(self, mean, covariance, track_id, n_init, max_age,
-                 feature=None, detection=None):
+                 feature=None, detection=None, use_kalman=True):
         self.mean = mean
         self.covariance = covariance
         self.track_id = track_id
@@ -72,9 +72,10 @@ class Track:
         self.age = 1
         self.time_since_update = 0
         self.detection = detection
+        self.use_kalman = use_kalman
 
-        # self.state = TrackState.Tentative
-        self.state = TrackState.Confirmed
+        self.state = TrackState.Tentative
+        # self.state = TrackState.Confirmed
         self.features = []
         if feature is not None:
             self.features.append(feature)
@@ -92,6 +93,8 @@ class Track:
             The bounding box.
 
         """
+        if (not self.use_kalman):
+            return self.detection.tlwh
         ret = self.mean[:4].copy()
         ret[2] *= ret[3]
         ret[:2] -= ret[2:] / 2
@@ -137,10 +140,13 @@ class Track:
             The associated detection.
 
         """
+        # import pdb
+        # pdb.set_trace()
         self.mean, self.covariance = kf.update(
             self.mean, self.covariance, detection.to_xyah())
         self.features.append(detection.feature)
-        self.detection = detection
+        if (not self.use_kalman):
+            self.detection = detection
 
         self.hits += 1
         self.time_since_update = 0

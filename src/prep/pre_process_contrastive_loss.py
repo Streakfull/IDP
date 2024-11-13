@@ -22,7 +22,7 @@ class PreProcessContrastiveLoss():
             self.frames = self.frames[:max_frames]
         self.min_matching_dist = 20
         self.data_set_path = "./raw_dataset/match_pairs"
-        self.max_pairs = 30000
+        self.max_pairs = 25_000
 
     def add_features(self):
         for frame in self.frames:

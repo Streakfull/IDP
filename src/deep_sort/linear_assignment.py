@@ -189,3 +189,8 @@ def gate_cost_matrix(
             track.mean, track.covariance, measurements, only_position)
         cost_matrix[row, gating_distance > gating_threshold] = gated_cost
     return cost_matrix
+
+
+def gate_cost_neural(cost_matrix, threshhold):
+    cost_matrix[cost_matrix > threshhold] = INFTY_COST
+    return cost_matrix

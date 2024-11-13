@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 class ContrastiveLoss(torch.nn.Module):
     def __init__(self, margin=2.0):
-        super(ContrastiveLoss, self).__init__()
+        super().__init__()
         self.margin = margin
 
     def forward(self, output1, output2, label):

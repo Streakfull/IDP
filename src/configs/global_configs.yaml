@@ -1,12 +1,12 @@
 training:
   name: siamese-lin-bn-conv
   description: Debug
-  experiment_id: full-ds-2
+  experiment_id: 200k-samples
   extra_notes: none
   logs_dir: ../logs/training
   is_train: true
   device: cuda:0
-  batch_size: 64
+  batch_size: 256
   num_workers: 16
   test_size: 0.1
   n_epochs: 100
@@ -34,7 +34,7 @@ dataset:
   sim_matches:
     class_filepath: ./datasets/SimMatches.py 
     class: SimMatches
-    path: ./raw_dataset/match_pairs/random_samples_30k
+    path: ./raw_dataset/match_pairs/random_samples_200k
 
 
 model:

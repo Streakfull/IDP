@@ -1,5 +1,6 @@
 # vim: expandtab:ts=4:sw=4
 import numpy as np
+import torch
 
 
 def _pdist(a, b):
@@ -97,6 +98,29 @@ def _nn_cosine_distance(x, y):
     return distances.min(axis=0)
 
 
+def _neural_distance(x, y, model):
+    total_dist = None
+    for sample in x:
+        current_dist = _neural_dist_one(sample, y, model)
+        if (total_dist is None):
+            total_dist = current_dist
+        else:
+            total_dist = torch.vstack((total_dist, current_dist))
+    min_dist, _ = torch.min(total_dist, axis=0)
+    dist = min_dist.cpu().numpy()
+    return dist
+
+
+def _neural_dist_one(x, y, model):
+    device = next(model.parameters()).device
+    y = torch.Tensor(y).to(device)
+    n, m = y.shape
+    x = torch.Tensor(x).to(device)
+    x = x.repeat(n, 1)
+    dist = model.cos_distance(x, y)
+    return dist
+
+
 class NearestNeighborDistanceMetric(object):
     """
     A nearest neighbor distance metric that, for each target, returns
@@ -121,18 +145,23 @@ class NearestNeighborDistanceMetric(object):
 
     """
 
-    def __init__(self, metric, matching_threshold, budget=None):
+    def __init__(self, metric, matching_threshold, budget=None, cost_model=None):
 
         if metric == "euclidean":
             self._metric = _nn_euclidean_distance
         elif metric == "cosine":
             self._metric = _nn_cosine_distance
+        elif metric == "siamese":
+            self._metric = _neural_distance
         else:
             raise ValueError(
                 "Invalid metric; must be either 'euclidean' or 'cosine'")
+
         self.matching_threshold = matching_threshold
         self.budget = budget
         self.samples = {}
+        self.cost_model = cost_model
+        self.metric = metric
 
     def partial_fit(self, features, targets, active_targets):
         """Update the distance metric with new data.
@@ -174,5 +203,10 @@ class NearestNeighborDistanceMetric(object):
 
         cost_matrix = np.zeros((len(targets), len(features)))
         for i, target in enumerate(targets):
-            cost_matrix[i, :] = self._metric(self.samples[target], features)
+            if (self.metric == "siamese"):
+                cost_matrix[i, :] = self._metric(
+                    self.samples[target], features, self.cost_model)
+            else:
+                cost_matrix[i, :] = self._metric(
+                    self.samples[target], features)
         return cost_matrix

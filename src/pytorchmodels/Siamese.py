@@ -72,3 +72,12 @@ class Siamese(BaseModel):
         self.eval()
         _, _, pred = self.forward(x)
         return pred
+
+    def cos_distance(self, x1, x2):
+        self.eval()
+        with torch.no_grad():
+            x1, x2 = self.network.backbone(x1), self.network.backbone(x2)
+            return self.contrastive_loss.cos_distance(x1, x2)
+
+    def name(self):
+        return 'SiameseFCNetwork'
