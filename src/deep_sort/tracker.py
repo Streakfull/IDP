@@ -39,7 +39,7 @@ class Tracker:
 
     """
 
-    def __init__(self, metric, max_iou_distance=0.7, max_age=30, n_init=3, print_cost_matrix=False, use_kalman=True):
+    def __init__(self, metric, max_iou_distance=0.7, max_age=30, n_init=3, print_cost_matrix=False, use_kalman=True, start_confirmed=False):
         self.metric = metric
         self.max_iou_distance = max_iou_distance
         self.max_age = max_age
@@ -51,6 +51,7 @@ class Tracker:
         self.tracks = []
         self._next_id = 1
         self.use_kalman = use_kalman
+        self.start_confirmed = start_confirmed
 
         self.metrics = {
             "removed": 0,
@@ -157,7 +158,7 @@ class Tracker:
             linear_assignment.matching_cascade(
                 gated_metric, self.metric.matching_threshold, self.max_age,
                 self.tracks, detections, confirmed_tracks)
-        # print(matches_a, "SKIP CONFIRMED")
+        # print(matches_a, "Matches")
 
         # Associate remaining tracks together with unconfirmed tracks using IOU.
         iou_track_candidates = unconfirmed_tracks + [
@@ -184,6 +185,6 @@ class Tracker:
         mean, covariance = self.kf.initiate(detection.to_xyah())
         self.tracks.append(Track(
             mean, covariance, self._next_id, self.n_init, self.max_age,
-            detection.feature, detection))
+            detection.feature, detection, use_kalman=self.use_kalman, start_confirmed=self.start_confirmed))
         self._next_id += 1
         self.metrics["new_ids"] += 1

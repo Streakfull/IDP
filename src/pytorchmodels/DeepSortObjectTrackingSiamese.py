@@ -26,22 +26,26 @@ import copy
 from pytorchmodels.Siamese import Siamese
 import yaml
 
-"logs/training/siamese-lin-bn-conv/full-ds-2/2024_11_12_19_50_03/checkpoints/epoch-best.ckpt"
+k_200 = "../logs/training/siamese-lin-bn-conv/200k-samples/2024_11_13_02_07_53/checkpoints/epoch-best.ckpt"
+k_30 = "../logs/training/siamese-lin-bn-conv/full-ds-2/2024_11_12_19_50_03/checkpoints/epoch-best.ckpt"
+close = "../logs/training/siamese-lin-bn-conv/close-samples/2024_11_13_23_11_48/checkpoints/epoch-best.ckpt"
+negative_close = "../logs/training/siamese-lin-bn-conv/negative-close-samples/2024_11_14_00_11_50/checkpoints/epoch-best.ckpt"
 nn_margin = 0.1
 
 
 class DeepSortObjectTrackingSiamese(ObjectDetection):
 
-    def __init__(self, capture, write_path, use_kalman=True) -> None:
+    def __init__(self, capture, write_path, use_kalman=True, start_confirmed=False) -> None:
         super().__init__(capture)
         self.min_confidence = 0.25
         self.max_cosine_distance = 0.2
         self.nn_budget = None
         self.write_path = write_path
         self.frame_count = 0
-        self.siamese_ckpt_path = "../logs/training/siamese-lin-bn-conv/full-ds-2/2024_11_12_19_50_03/checkpoints/epoch-best.ckpt"
+        self.siamese_ckpt_path = close
         self.configs_path = "./configs/global_configs.yaml"
         self.use_kalman = use_kalman
+        self.start_confirmed = start_confirmed
 
         with open(self.configs_path, "r") as in_file:
             self.global_configs = yaml.safe_load(in_file)
@@ -122,11 +126,19 @@ class DeepSortObjectTrackingSiamese(ObjectDetection):
             total_frames = max_frames
         frame = 0
         self.frame_count = 0
+        if (start_frame is not None):
+            if (max_frames is not None):
+                total_frames += start_frame
 
         metric = nn_matching.NearestNeighborDistanceMetric(
             "cosine", self.max_cosine_distance, None)
         tracker = Tracker(
-            metric, print_cost_matrix=print_cost_matrix, max_age=max_age)
+            metric,
+            print_cost_matrix=print_cost_matrix,
+            max_age=max_age,
+            use_kalman=self.use_kalman,
+            start_confirmed=self.start_confirmed)
+
         stored_metrics = copy.deepcopy(tracker.metrics)
         all_frames_diff = {}
         plotted_frames = []
@@ -158,6 +170,7 @@ class DeepSortObjectTrackingSiamese(ObjectDetection):
                         continue
 
                     bbox = track.to_tlbr()
+                   # bbox = track.get_detection().to_tlbr()
                     conf = track.get_detection().get_conf()
                     cls = track.get_detection().get_cls()
 
@@ -187,6 +200,7 @@ class DeepSortObjectTrackingSiamese(ObjectDetection):
                     #         all_frames_diff,  f"{frame_difference_write_path}/frame_diff.json")
                 if write_directly:
                     cv2.imwrite(f"{write_path}/{frame_name}.jpg", frames)
+                   # cv2.imwrite(f"{write_path}/{frame_name}.jpg", img)
                 else:
                     plotted_frames.append(frames)
                 frame += 1

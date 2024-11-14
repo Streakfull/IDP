@@ -2,15 +2,19 @@ import os
 import numpy as np
 import json
 from lutils.general import write_json
+from PIL import Image
 
 
 class PreProcessContrastiveLoss():
 
     def __init__(self, in_path,
                  write_path,
+                 max_pairs,
                  write_path_features=None,
                  max_frames=None,
-                 in_path_features=None) -> None:
+                 in_path_features=None,
+                 frames_path=None
+                 ) -> None:
         self.in_path = in_path
         self.write_path = write_path
         self.write_path_features = write_path_features
@@ -22,7 +26,8 @@ class PreProcessContrastiveLoss():
             self.frames = self.frames[:max_frames]
         self.min_matching_dist = 20
         self.data_set_path = "./raw_dataset/match_pairs"
-        self.max_pairs = 25_000
+        self.max_pairs = max_pairs
+        self.frames_path = frames_path
 
     def add_features(self):
         for frame in self.frames:
@@ -144,53 +149,96 @@ class PreProcessContrastiveLoss():
             matches_dict, f"{self.data_set_path}/meta/matches_dict.json")
         return matches_dict
 
-    def constuct_positive_pairs(self, input_dict, freq_dict, samples_path="samples"):
+    def constuct_positive_pairs(self, input_dict, freq_dict, samples_path="samples", all_close=False, is_visual=False):
         object_ids = list(input_dict.keys())
         object_ids.sort()
         probs = [freq_dict[object_id] for object_id in object_ids]
         chosen = {}
         i = 0
         while (i < self.max_pairs):
-            object_id = np.random.choice(object_ids, size=1, p=probs)[0]
-            if (object_id not in chosen):
-                chosen[object_id] = {}
-            occ = matches = input_dict[object_id]
-            occ = list(occ.keys())
-            occ.sort()
-            is_close = np.random.rand() <= 0.5
-            occ = np.array(occ)
-            x1 = pivot = np.random.choice(occ, size=1)[0]
-            occ = occ[occ != x1]
-            d_arr = np.abs(occ - pivot)
-            if (is_close):
-                d_arr = 1/d_arr
-            total = d_arr.sum()
-            p = d_arr/total
-            if (len(occ) <= 1):
-                continue
             while True:
+                object_id = np.random.choice(object_ids, size=1, p=probs)[0]
+                if (object_id not in chosen):
+                    chosen[object_id] = {}
+                occ = matches = input_dict[object_id]
+                occ = list(occ.keys())
+                occ.sort()
+                is_close = np.random.rand() <= 0.5 if all_close is False else True
+                occ = np.array(occ)
+                x1 = pivot = np.random.choice(occ, size=1)[0]
+                occ = occ[occ != x1]
+                d_arr = np.abs(occ - pivot)
+                if (is_close):
+                    d_arr = 1/d_arr
+                total = d_arr.sum()
+                p = d_arr/total
+                if (len(occ) <= 1):
+                    break
+
                 x2 = np.random.choice(occ, size=1, p=p)[0]
                 prev_obj_matches = chosen[object_id]
                 if (x1 not in prev_obj_matches):
                     prev_obj_matches[int(x1)] = []
                 if (x2 not in prev_obj_matches):
                     prev_obj_matches[int(x2)] = []
-                if (x1 in prev_obj_matches[int(x2)] or x2 in prev_obj_matches[x2]):
+                if (x1 in prev_obj_matches[int(x2)] or x2 in prev_obj_matches[int(x2)]):
+
+                   # print("here??", x1, x2)
                     continue
                 else:
                     prev_obj_matches[int(x1)].append(x2)
                     prev_obj_matches[int(x2)].append(x1)
-                    break
-            x1f = self.construct_sample_from_dict(matches[x1])
-            x2f = self.construct_sample_from_dict(
-                matches[x2])
-            pair = np.vstack((x1f, x2f))
-            pair_name = f"{int(object_id)}-{x1}-{x2}-1"
-            np.savetxt(
-                f"{self.data_set_path}/{samples_path}/{pair_name}.txt", pair)
-            i += 1
-            # import pdb
-            # pdb.set_trace()
+                    # break
+                if (is_visual):
+                    self.write_visual_folder(
+                        object_id, x1, x2, matches[x1], matches[x2], samples_path)
+                else:
+                    x1f = self.construct_sample_from_dict(matches[x1])
+                    x2f = self.construct_sample_from_dict(
+                        matches[x2])
+                    pair = np.vstack((x1f, x2f))
+                    pair_name = f"{int(object_id)}-{x1}-{x2}-1"
+                    np.savetxt(
+                        f"{self.data_set_path}/{samples_path}/{pair_name}.txt", pair)
+                    # print("HERE END?")
+                i += 1
+                break
+
+                # import pdb
+                # pdb.set_trace()
+
+    # def get_img_crop_from_frame(self, box, frame):
+    #     img = np.array(Image.open(f"{self.frames_path}/frame_{frame}.jpg"))
+    #     crop = img[int(box[1]): int(
+    #         box[3]), int(box[0]): int(box[2])]
+    #     img = Image.fromarray(crop)
+    #     img = img.resize((225, 225), Image.ANTIALIAS)
+    #     return img
+
+    def get_img_crop_from_frame(self, box, frame, crop_size=(225, 225)):
+        # Load the frame as a NumPy array
+        img = np.array(Image.open(f"{self.frames_path}/frame_{frame}.jpg"))
+        img_height, img_width = img.shape[:2]
+
+        # Calculate the center of the bounding box
+        box_center_x = int((box[0] + box[2]) / 2)
+        box_center_y = int((box[1] + box[3]) / 2)
+
+        # Define the crop boundaries based on the center and crop size
+        half_crop_width, half_crop_height = crop_size[0] // 2, crop_size[1] // 2
+        left = max(0, box_center_x - half_crop_width)
+        right = min(img_width, box_center_x + half_crop_width)
+        top = max(0, box_center_y - half_crop_height)
+        bottom = min(img_height, box_center_y + half_crop_height)
+
+        # Crop the image
+        crop = img[top:bottom, left:right]
+
+        # Convert the cropped region back to a PIL Image and resize to ensure fixed size
+        img = Image.fromarray(crop)
+        img = img.resize(crop_size, Image.ANTIALIAS)
+
+        return img
 
     def construct_sample_from_dict(self, sample):
         bb = sample["bb"]
@@ -212,7 +260,7 @@ class PreProcessContrastiveLoss():
         values_total = np.array(list(freq_dict.values())).sum()
         return freq_dict
 
-    def construct_negative_pairs(self, input_dict, freq_dict, samples_path="samples"):
+    def construct_negative_pairs(self, input_dict, freq_dict, samples_path="samples", all_close=False, is_visual=False):
         object_ids = list(input_dict.keys())
         object_ids.sort()
         probs = [freq_dict[object_id] for object_id in object_ids]
@@ -242,6 +290,7 @@ class PreProcessContrastiveLoss():
                 if (len(occx2) <= 1):
                     continue
                 x2 = np.random.choice(occx2, size=1, p=p)[0]
+                x2_dict = matchesx2[x2]
                 x2f = self.construct_sample_from_dict(matchesx2[x2])
                 pair_name = f"{int(x1_mid)}d{int(x2_mid)}-{x1}-{x2}-0"
             else:
@@ -263,7 +312,8 @@ class PreProcessContrastiveLoss():
                 bb_arr = np.delete(bb_arr, pivot_index, axis=0)
                 d_arr = self.find_dist_arr(pivot_bb, bb_arr)
                 frame_ids = np.delete(frame_ids, pivot_index)
-                if (is_close):
+                is_close_frames = is_close if all_close is False else True
+                if (is_close_frames):
                     d_arr = 1/d_arr
                 total = d_arr.sum()
                 p = d_arr/total
@@ -272,13 +322,41 @@ class PreProcessContrastiveLoss():
                 x2_preid = np.random.choice(frame_ids, size=1, p=p)[0]
                 # import pdb
                 # pdb.set_trace()
+                x2_dict = input_dict[x2_preid][x1]
+                x2 = x1
                 x2f = self.construct_sample_from_dict(
-                    input_dict[x2_preid][x1])
+                    x2_dict)
                 pair_name = f"{int(x1_mid)}s{x2_preid}-{x1}-{x1}-0"
 
-                # pivot_bb = bb_arr
-            x1f = self.construct_sample_from_dict(matchesx1[x1])
-            pair = np.vstack((x1f, x2f))
-            np.savetxt(
-                f"{self.data_set_path}/{samples_path}/{pair_name}.txt", pair)
+            if (is_visual):
+                x1_dict = matchesx1[x1]
+                self.write_visual_folder(
+                    x1_mid, x1, x2,
+                    x1_dict=x1_dict,
+                    x2_dict=x2_dict,
+                    is_positive=False, x2_id=x2_mid,
+                    samples_path=samples_path
+                )
+            else:
+                x1f = self.construct_sample_from_dict(matchesx1[x1])
+                pair = np.vstack((x1f, x2f))
+                np.savetxt(
+                    f"{self.data_set_path}/{samples_path}/{pair_name}.txt", pair)
             i += 1
+
+    def write_visual_folder(self, object_id, x1_frame, x2_frame, x1_dict, x2_dict, samples_path, is_positive=True, x2_id=None):
+        folder_name = f"{int(object_id)}-{x1_frame}-{x2_frame}-1"
+        if (not is_positive):
+            folder_name = f"{int(object_id)}-{int(x2_id)}-{x1_frame}-{x2_frame}-0"
+        # x1_frame =
+        x1_img = self.get_img_crop_from_frame(x1_dict["bb"], x1_frame)
+        x2_img = self.get_img_crop_from_frame(x2_dict["bb"], x2_frame)
+        x1f = self.construct_sample_from_dict(x1_dict)
+        x2f = self.construct_sample_from_dict(
+            x2_dict)
+        dir_path = f"{self.data_set_path}/{samples_path}/{folder_name}"
+        os.makedirs(dir_path, exist_ok=True)
+        x1_img.save(f"{dir_path}/x1.jpg")
+        x2_img.save(f"{dir_path}/x2.jpg")
+        np.savetxt(f"{dir_path}/x1.txt", x1f)
+        np.savetxt(f"{dir_path}/x2.txt", x2f)

@@ -1,7 +1,7 @@
 training:
-  name: siamese-lin-bn-conv
+  name: debug
   description: Debug
-  experiment_id: 200k-samples
+  experiment_id: visual_samples_100k
   extra_notes: none
   logs_dir: ../logs/training
   is_train: true
@@ -25,7 +25,7 @@ training:
   ckpt_path: logs/fullTrain/fullTrain4Continue/2024_08_08_14_33_28/checkpoints/epoch-latest.ckpt
 
 dataset:
-  dataset_field: sim_matches
+  dataset_field: visual_sim_matches
   path: None
   overfit_size: 5
   split: train # train | valid | test
@@ -34,7 +34,13 @@ dataset:
   sim_matches:
     class_filepath: ./datasets/SimMatches.py 
     class: SimMatches
-    path: ./raw_dataset/match_pairs/random_samples_200k
+    path: ./raw_dataset/match_pairs/negative_close_samples_200k
+
+  visual_sim_matches:
+    class_filepath: ./datasets/VisualSimMatches.py 
+    class: VisualSimMatches
+    path: ./raw_dataset/match_pairs/visual_samples_100k
+  
 
 
 model:
@@ -62,5 +68,7 @@ model:
     weight_init: None
     scheduler_step_size: 25
     scheduler_gamma: 0.5
+  
+
 
 
