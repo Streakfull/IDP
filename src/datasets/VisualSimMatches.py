@@ -56,18 +56,21 @@ class VisualSimMatches(BaseDataSet):
         return {
             "x1_img": x1_img,
             "x2_img": x2_img,
-            "x1_f": x1f,
-            "x2_f": x2f,
+            "x1f": x1f,
+            "x2f": x2f,
             "label": tgt
         }
 
     @staticmethod
     def move_batch_to_device(batch, device):
-        # Move each element of the batch (images and features) to the specified device
-        x1_img, x2_img, x1f, x2f = batch["x1_img"], batch["x2_img"], batch["x1_features"], batch["x2_features"]
-        x1_img = x1_img.to(device)
-        x2_img = x2_img.to(device)
-        x1f = x1f.to(device)
-        x2f = x2f.to(device)
+        """
+        Moves each element of the batch (images and features) to the specified device.
+        """
+        # Move the images and feature tensors to the specified device (e.g., 'cuda:0' or 'cpu')
+        batch["x1_img"] = batch["x1_img"].to(device)
+        batch["x2_img"] = batch["x2_img"].to(device)
+        batch["x1f"] = batch["x1f"].to(device)
+        batch["x2f"] = batch["x2f"].to(device)
+        batch["label"] = batch["label"].long().to(device)
 
-        return {"x1_img": x1_img, "x2_img": x2_img, "x1_features": x1f, "x2_features": x2f}
+        return batch

@@ -76,3 +76,6 @@ class SiameseNetwork(nn.Module):
         fc = fc.flatten(start_dim=1)
         fc = self.cls(fc)
         return x1, x2, fc
+
+    def img_feature(self, x):
+        return self.backbone(x)

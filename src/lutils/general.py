@@ -70,3 +70,29 @@ def mkdir(path):
         os.makedirs(path)
         return
     cprint.ok(f"- {path} directory found")
+
+
+def get_img_crop_from_frame(box, frame, crop_size=(225, 225)):
+    # Load the frame as a NumPy array
+    img = frame
+    img_height, img_width = img.shape[:2]
+
+    # Calculate the center of the bounding box
+    box_center_x = int((box[0] + box[2]) / 2)
+    box_center_y = int((box[1] + box[3]) / 2)
+
+    # Define the crop boundaries based on the center and crop size
+    half_crop_width, half_crop_height = crop_size[0] // 2, crop_size[1] // 2
+    left = max(0, box_center_x - half_crop_width)
+    right = min(img_width, box_center_x + half_crop_width)
+    top = max(0, box_center_y - half_crop_height)
+    bottom = min(img_height, box_center_y + half_crop_height)
+
+    # Crop the image
+    crop = img[top:bottom, left:right]
+
+    # Convert the cropped region back to a PIL Image and resize to ensure fixed size
+    img = Image.fromarray(crop)
+    img = img.resize(crop_size, Image.ANTIALIAS)
+
+    return img

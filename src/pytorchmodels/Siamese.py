@@ -5,15 +5,17 @@ from blocks.siamese_network import SiameseNetwork
 from torch import optim
 from lutils.model_utils import init_weights
 from losses.constrastive_loss import ContrastiveLoss
+from blocks.visual_siamese_network import VisualSiameseNetwork
 
 
 class Siamese(BaseModel):
     def __init__(self, configs):
         super().__init__()
-        self.network = SiameseNetwork()
 
         self.configs = configs
         init_type = self.configs['weight_init']
+        self.use_visual = self.configs['use_visual']
+        self.network = SiameseNetwork() if not self.use_visual else VisualSiameseNetwork()
         if (init_type != "None"):
             print("Initializing model weights with %s initialization" % init_type)
             self.init_weights()

@@ -19,7 +19,7 @@ from torchvision import models
 from torchvision import transforms
 from PIL import Image
 from lutils.yollov11_features import _predict_once, non_max_suppression, get_object_features
-from lutils.general import write_json
+from lutils.general import write_json, get_img_crop_from_frame
 from ultralytics.utils.ops import xywh2xyxy, scale_boxes
 from ultralytics.engine.results import Results
 import copy
@@ -30,22 +30,42 @@ k_200 = "../logs/training/siamese-lin-bn-conv/200k-samples/2024_11_13_02_07_53/c
 k_30 = "../logs/training/siamese-lin-bn-conv/full-ds-2/2024_11_12_19_50_03/checkpoints/epoch-best.ckpt"
 close = "../logs/training/siamese-lin-bn-conv/close-samples/2024_11_13_23_11_48/checkpoints/epoch-best.ckpt"
 negative_close = "../logs/training/siamese-lin-bn-conv/negative-close-samples/2024_11_14_00_11_50/checkpoints/epoch-best.ckpt"
-nn_margin = 0.1
+visual_siamese = "../logs/training/siamese-resnet/visual_samples_100k/2024_11_14_03_02_33/checkpoints/epoch-best.ckpt"
+random_200k = "../logs/training/siamese-lin-bn-conv/uniform_samples_200k/2024_11_14_04_21_24/checkpoints/epoch-best.ckpt"
+text_10k = '../logs/training/eval/fc/10k/exp_1/2024_11_14_12_35_01/checkpoints/epoch-16.ckpt'
+text_10k_uniform = "../logs/training/eval/fc/10k/uniform/2024_11_14_12_40_23/checkpoints/epoch-18.ckpt"
+visual_10k = "../logs/training/eval/visual/10k/exp_1/2024_11_14_13_42_52/checkpoints/epoch-8.ckpt"
+visual_30k = "../logs/training/eval/visual/30k/exp_1/2024_11_14_14_02_57/checkpoints/epoch-5.ckpt"
+text_50k = '../logs/training/eval/fc/50k/exp_1/2024_11_14_12_46_46/checkpoints/epoch-14.ckpt'
+text_100k = '../logs/training/eval/fc/100k/exp_1/2024_11_14_13_08_48/checkpoints/epoch-8.ckpt'
+visual_100k = "../logs/training/eval/visual/100k/exp_1/2024_11_14_15_56_17/checkpoints/epoch-2.ckpt"
+visual_200k = "../logs/training/eval/visual/200k/exp_1/2024_11_14_17_15_36/checkpoints/epoch-latest.ckpt"
+
+transform = transforms.Compose([
+    # Resize to 224x224 (or your target size)
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),          # Convert image to tensor
+    # Normalize for pre-trained models
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[
+        0.229, 0.224, 0.225])
+])
 
 
 class DeepSortObjectTrackingSiamese(ObjectDetection):
 
-    def __init__(self, capture, write_path, use_kalman=True, start_confirmed=False) -> None:
+    def __init__(self, capture, write_path, use_kalman=True, start_confirmed=False, use_visual_siamese=False, use_siamese=True) -> None:
         super().__init__(capture)
         self.min_confidence = 0.25
         self.max_cosine_distance = 0.2
         self.nn_budget = None
         self.write_path = write_path
         self.frame_count = 0
-        self.siamese_ckpt_path = close
+        self.siamese_ckpt_path = visual_100k
         self.configs_path = "./configs/global_configs.yaml"
         self.use_kalman = use_kalman
         self.start_confirmed = start_confirmed
+        self.use_visual_siamese = use_visual_siamese
+        self.use_siamese = use_siamese
 
         with open(self.configs_path, "r") as in_file:
             self.global_configs = yaml.safe_load(in_file)
@@ -238,23 +258,38 @@ class DeepSortObjectTrackingSiamese(ObjectDetection):
         results = self.get_full_pred(det)
         features = det.feats
         objects = list(map(Detection, results))
-        with torch.no_grad():
-            features = self.siamese_network.network.backbone(features)
-        # import pdb
+        if (self.use_siamese):
+            if (self.use_visual_siamese):
+                features = self.get_visual_crop_features(det, frame)
+            else:
+                with torch.no_grad():
+                    features = self.siamese_network.network.backbone(features)
+            # import pdb
         # pdb.set_trace()
-        for i in range(len(features)):
-            feat = features[i]
-            detection = objects[i]
-            detection.set_feature(feat)
+        try:
+            for i in range(len(features)):
+                feat = features[i]
+                detection = objects[i]
+                detection.set_feature(feat)
+        except:
+            import pdb
+            pdb.set_trace()
         return objects
 
-    def get_crops(self, res, frame):
-        crop_objects = []
-        for box in res:
-            crop_obj = frame[int(box[1]): int(
-                box[3]), int(box[0]): int(box[2])]
-            crop_objects.append(crop_obj)
-        return crop_objects
+    def get_visual_crop_features(self, det, frame):
+        boxes = det.boxes.xyxy
+        features = []
+        for box in boxes:
+            img_crop = get_img_crop_from_frame(box, frame).convert('RGB')
+            img_crop = transform(img_crop)
+            with torch.no_grad():
+                self.siamese_network.network.resnet.eval()
+                self.siamese_network.eval()
+                self.siamese_network.network.eval()
+                feat = self.siamese_network.network.img_feature(
+                    img_crop.to("cuda:0").unsqueeze(0))
+                features.append(feat.squeeze(0))
+        return features
 
     def get_full_pred(self, det):
         try:

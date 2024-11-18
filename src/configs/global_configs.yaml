@@ -1,20 +1,20 @@
 training:
-  name: debug
+  name: 200k
   description: Debug
-  experiment_id: visual_samples_100k
+  experiment_id: exp_1
   extra_notes: none
-  logs_dir: ../logs/training
+  logs_dir: ../logs/training/eval/visual
   is_train: true
   device: cuda:0
-  batch_size: 256
+  batch_size: 32
   num_workers: 16
   test_size: 0.1
   n_epochs: 100
   append_loss_every: 250
   print_every: 500
-  validate_every: 833
-  save_every: 3330
-  save_every_nepochs: 25
+  validate_every: 5643
+  save_every: 5643
+  save_every_nepochs: 1
   start_epoch: 0
   start_iteration: 0
   visualize_every: 500
@@ -34,12 +34,12 @@ dataset:
   sim_matches:
     class_filepath: ./datasets/SimMatches.py 
     class: SimMatches
-    path: ./raw_dataset/match_pairs/negative_close_samples_200k
+    path: ./raw_dataset/match_pairs/eval/100k/text
 
   visual_sim_matches:
     class_filepath: ./datasets/VisualSimMatches.py 
     class: VisualSimMatches
-    path: ./raw_dataset/match_pairs/visual_samples_100k
+    path: ./raw_dataset/match_pairs/eval/200k/visual
   
 
 
@@ -68,6 +68,7 @@ model:
     weight_init: None
     scheduler_step_size: 25
     scheduler_gamma: 0.5
+    use_visual: True
   
 
 

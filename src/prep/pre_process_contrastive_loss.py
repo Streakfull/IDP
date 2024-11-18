@@ -3,6 +3,7 @@ import numpy as np
 import json
 from lutils.general import write_json
 from PIL import Image
+from tqdm.notebook import tqdm
 
 
 class PreProcessContrastiveLoss():
@@ -25,7 +26,7 @@ class PreProcessContrastiveLoss():
         if (self.max_frames is not None):
             self.frames = self.frames[:max_frames]
         self.min_matching_dist = 20
-        self.data_set_path = "./raw_dataset/match_pairs"
+        self.data_set_path = "./raw_dataset/match_pairs/eval"
         self.max_pairs = max_pairs
         self.frames_path = frames_path
 
@@ -149,60 +150,70 @@ class PreProcessContrastiveLoss():
             matches_dict, f"{self.data_set_path}/meta/matches_dict.json")
         return matches_dict
 
-    def constuct_positive_pairs(self, input_dict, freq_dict, samples_path="samples", all_close=False, is_visual=False):
+    def constuct_positive_pairs(self, input_dict, freq_dict, samples_path="samples", all_close=False, is_visual=False, all_random=False, all_far=False):
         object_ids = list(input_dict.keys())
         object_ids.sort()
-        probs = [freq_dict[object_id] for object_id in object_ids]
+        probs = [freq_dict[object_id]
+                 for object_id in object_ids]
+        if (all_random):
+            probs = None
         chosen = {}
         i = 0
-        while (i < self.max_pairs):
-            while True:
-                object_id = np.random.choice(object_ids, size=1, p=probs)[0]
-                if (object_id not in chosen):
-                    chosen[object_id] = {}
-                occ = matches = input_dict[object_id]
-                occ = list(occ.keys())
-                occ.sort()
-                is_close = np.random.rand() <= 0.5 if all_close is False else True
-                occ = np.array(occ)
-                x1 = pivot = np.random.choice(occ, size=1)[0]
-                occ = occ[occ != x1]
-                d_arr = np.abs(occ - pivot)
-                if (is_close):
-                    d_arr = 1/d_arr
-                total = d_arr.sum()
-                p = d_arr/total
-                if (len(occ) <= 1):
+        with tqdm(total=self.max_pairs, desc="Processing Pairs", unit="pair") as pbar:
+            while (i < self.max_pairs):
+                while True:
+                    object_id = np.random.choice(
+                        object_ids, size=1, p=probs)[0]
+                    if (object_id not in chosen):
+                        chosen[object_id] = {}
+                    occ = matches = input_dict[object_id]
+                    occ = list(occ.keys())
+                    occ.sort()
+                    is_close = np.random.rand() <= 0.5 if all_close is False else True
+                    if (all_far):
+                        is_close = False
+                    occ = np.array(occ)
+                    x1 = pivot = np.random.choice(occ, size=1)[0]
+                    occ = occ[occ != x1]
+                    d_arr = np.abs(occ - pivot)
+                    if (is_close):
+                        d_arr = 1/d_arr
+
+                    total = d_arr.sum()
+                    p = d_arr/total
+                    if (len(occ) <= 1):
+                        break
+                    if (all_random):
+                        p = None
+                    x2 = np.random.choice(occ, size=1, p=p)[0]
+                    prev_obj_matches = chosen[object_id]
+                    if (x1 not in prev_obj_matches):
+                        prev_obj_matches[int(x1)] = []
+                    if (x2 not in prev_obj_matches):
+                        prev_obj_matches[int(x2)] = []
+                    if (x1 in prev_obj_matches[int(x2)] or x2 in prev_obj_matches[int(x2)]):
+
+                        # print("here??", x1, x2)
+                        continue
+                    else:
+                        prev_obj_matches[int(x1)].append(x2)
+                        prev_obj_matches[int(x2)].append(x1)
+                        # break
+                    if (is_visual):
+                        self.write_visual_folder(
+                            object_id, x1, x2, matches[x1], matches[x2], samples_path)
+                    else:
+                        x1f = self.construct_sample_from_dict(matches[x1])
+                        x2f = self.construct_sample_from_dict(
+                            matches[x2])
+                        pair = np.vstack((x1f, x2f))
+                        pair_name = f"{int(object_id)}-{x1}-{x2}-1"
+                        np.savetxt(
+                            f"{self.data_set_path}/{samples_path}/{pair_name}.txt", pair)
+                        # print("HERE END?")
+                    i += 1
+                    pbar.update(1)
                     break
-
-                x2 = np.random.choice(occ, size=1, p=p)[0]
-                prev_obj_matches = chosen[object_id]
-                if (x1 not in prev_obj_matches):
-                    prev_obj_matches[int(x1)] = []
-                if (x2 not in prev_obj_matches):
-                    prev_obj_matches[int(x2)] = []
-                if (x1 in prev_obj_matches[int(x2)] or x2 in prev_obj_matches[int(x2)]):
-
-                   # print("here??", x1, x2)
-                    continue
-                else:
-                    prev_obj_matches[int(x1)].append(x2)
-                    prev_obj_matches[int(x2)].append(x1)
-                    # break
-                if (is_visual):
-                    self.write_visual_folder(
-                        object_id, x1, x2, matches[x1], matches[x2], samples_path)
-                else:
-                    x1f = self.construct_sample_from_dict(matches[x1])
-                    x2f = self.construct_sample_from_dict(
-                        matches[x2])
-                    pair = np.vstack((x1f, x2f))
-                    pair_name = f"{int(object_id)}-{x1}-{x2}-1"
-                    np.savetxt(
-                        f"{self.data_set_path}/{samples_path}/{pair_name}.txt", pair)
-                    # print("HERE END?")
-                i += 1
-                break
 
                 # import pdb
                 # pdb.set_trace()
@@ -265,6 +276,92 @@ class PreProcessContrastiveLoss():
         object_ids.sort()
         probs = [freq_dict[object_id] for object_id in object_ids]
         i = 0
+        with tqdm(total=self.max_pairs, desc="Processing Pairs", unit="pair") as pbar:
+            while (i < self.max_pairs):
+                x1_mid, x2_mid = np.random.choice(
+                    object_ids, size=2, p=probs, replace=False)
+                assert x1_mid != x2_mid
+                is_close = np.random.rand() <= 0.5
+                euclidean = np.random.rand() <= 0.5
+                occx1 = matchesx1 = input_dict[x1_mid]
+                occx2 = matchesx2 = input_dict[x2_mid]
+                occx1 = list(occx1.keys())
+                occx2 = list(occx2.keys())
+                occx1.sort()
+                occx2.sort()
+                occx1 = np.array(occx1)
+                occx2 = np.array(occx2)
+                x1 = pivot = np.random.choice(occx1, size=1)[0]
+                if (euclidean == False):
+                    occx2 = occx2[occx2 != pivot]
+                    d_occx2 = np.abs(occx2-pivot)
+                    if (is_close):
+                        d_occx2 = 1/d_occx2
+                    total = d_occx2.sum()
+                    p = d_occx2/total
+                    if (len(occx2) <= 1):
+                        continue
+                    x2 = np.random.choice(occx2, size=1, p=p)[0]
+                    x2_dict = matchesx2[x2]
+                    x2f = self.construct_sample_from_dict(matchesx2[x2])
+                    pair_name = f"{int(x1_mid)}d{int(x2_mid)}-{x1}-{x2}-0"
+                else:
+                    frame_ids = []
+                    bb_arr = []
+                    for object_id in object_ids:
+                        frames = input_dict[object_id]
+                        if (x1 in frames):
+                            frame_ids.append(object_id)
+                    for k in range(len(frame_ids)):
+                        oid = frame_ids[k]
+                        bb = input_dict[oid][x1]["bb"]
+                        bb_arr.append(bb)
+
+                    bb_arr = np.array(bb_arr)
+                    frame_ids = np.array(frame_ids)
+                    pivot_index = np.where(frame_ids == x1_mid)[0][0]
+                    pivot_bb = bb_arr[pivot_index]
+                    bb_arr = np.delete(bb_arr, pivot_index, axis=0)
+                    d_arr = self.find_dist_arr(pivot_bb, bb_arr)
+                    frame_ids = np.delete(frame_ids, pivot_index)
+                    is_close_frames = is_close if all_close is False else True
+                    if (is_close_frames):
+                        d_arr = 1/d_arr
+                    total = d_arr.sum()
+                    p = d_arr/total
+                    if (len(frame_ids) <= 1):
+                        continue
+                    x2_preid = np.random.choice(frame_ids, size=1, p=p)[0]
+                    # import pdb
+                    # pdb.set_trace()
+                    x2_dict = input_dict[x2_preid][x1]
+                    x2 = x1
+                    x2f = self.construct_sample_from_dict(
+                        x2_dict)
+                    pair_name = f"{int(x1_mid)}s{x2_preid}-{x1}-{x1}-0"
+
+                if (is_visual):
+                    x1_dict = matchesx1[x1]
+                    self.write_visual_folder(
+                        x1_mid, x1, x2,
+                        x1_dict=x1_dict,
+                        x2_dict=x2_dict,
+                        is_positive=False, x2_id=x2_mid,
+                        samples_path=samples_path
+                    )
+                else:
+                    x1f = self.construct_sample_from_dict(matchesx1[x1])
+                    pair = np.vstack((x1f, x2f))
+                    np.savetxt(
+                        f"{self.data_set_path}/{samples_path}/{pair_name}.txt", pair)
+                i += 1
+                pbar.update(1)
+
+    def construct_negative_pairs_all_random(self, input_dict, freq_dict, samples_path="samples", all_close=False, is_visual=False):
+        object_ids = list(input_dict.keys())
+        object_ids.sort()
+        probs = [freq_dict[object_id] for object_id in object_ids]
+        i = 0
         while (i < self.max_pairs):
             x1_mid, x2_mid = np.random.choice(
                 object_ids, size=2, p=probs, replace=False)
@@ -280,68 +377,17 @@ class PreProcessContrastiveLoss():
             occx1 = np.array(occx1)
             occx2 = np.array(occx2)
             x1 = pivot = np.random.choice(occx1, size=1)[0]
-            if (euclidean == False):
-                occx2 = occx2[occx2 != pivot]
-                d_occx2 = np.abs(occx2-pivot)
-                if (is_close):
-                    d_occx2 = 1/d_occx2
-                total = d_occx2.sum()
-                p = d_occx2/total
-                if (len(occx2) <= 1):
-                    continue
-                x2 = np.random.choice(occx2, size=1, p=p)[0]
-                x2_dict = matchesx2[x2]
-                x2f = self.construct_sample_from_dict(matchesx2[x2])
-                pair_name = f"{int(x1_mid)}d{int(x2_mid)}-{x1}-{x2}-0"
-            else:
-                frame_ids = []
-                bb_arr = []
-                for object_id in object_ids:
-                    frames = input_dict[object_id]
-                    if (x1 in frames):
-                        frame_ids.append(object_id)
-                for k in range(len(frame_ids)):
-                    oid = frame_ids[k]
-                    bb = input_dict[oid][x1]["bb"]
-                    bb_arr.append(bb)
-
-                bb_arr = np.array(bb_arr)
-                frame_ids = np.array(frame_ids)
-                pivot_index = np.where(frame_ids == x1_mid)[0][0]
-                pivot_bb = bb_arr[pivot_index]
-                bb_arr = np.delete(bb_arr, pivot_index, axis=0)
-                d_arr = self.find_dist_arr(pivot_bb, bb_arr)
-                frame_ids = np.delete(frame_ids, pivot_index)
-                is_close_frames = is_close if all_close is False else True
-                if (is_close_frames):
-                    d_arr = 1/d_arr
-                total = d_arr.sum()
-                p = d_arr/total
-                if (len(frame_ids) <= 1):
-                    continue
-                x2_preid = np.random.choice(frame_ids, size=1, p=p)[0]
-                # import pdb
-                # pdb.set_trace()
-                x2_dict = input_dict[x2_preid][x1]
-                x2 = x1
-                x2f = self.construct_sample_from_dict(
-                    x2_dict)
-                pair_name = f"{int(x1_mid)}s{x2_preid}-{x1}-{x1}-0"
-
-            if (is_visual):
-                x1_dict = matchesx1[x1]
-                self.write_visual_folder(
-                    x1_mid, x1, x2,
-                    x1_dict=x1_dict,
-                    x2_dict=x2_dict,
-                    is_positive=False, x2_id=x2_mid,
-                    samples_path=samples_path
-                )
-            else:
-                x1f = self.construct_sample_from_dict(matchesx1[x1])
-                pair = np.vstack((x1f, x2f))
-                np.savetxt(
-                    f"{self.data_set_path}/{samples_path}/{pair_name}.txt", pair)
+            occx2 = occx2[occx2 != pivot]
+            if (len(occx2) <= 1):
+                continue
+            x2 = np.random.choice(occx2, size=1)[0]
+            x2_dict = matchesx2[x2]
+            x2f = self.construct_sample_from_dict(matchesx2[x2])
+            pair_name = f"{int(x1_mid)}d{int(x2_mid)}-{x1}-{x2}-0"
+            x1f = self.construct_sample_from_dict(matchesx1[x1])
+            pair = np.vstack((x1f, x2f))
+            np.savetxt(
+                f"{self.data_set_path}/{samples_path}/{pair_name}.txt", pair)
             i += 1
 
     def write_visual_folder(self, object_id, x1_frame, x2_frame, x1_dict, x2_dict, samples_path, is_positive=True, x2_id=None):
