@@ -177,9 +177,9 @@ class CalcMetrics():
         all_gt_matches = self.map_pr_gt.get(pred_id, [])
         if (len(all_gt_matches) <= 1):
             return True
-        # current_temporal_match = self.temporal_map_gt_pr.get(gt_id, [])
-        # if (pred_id in current_temporal_match):
-        #     return True
+        current_temporal_match = self.temporal_map_gt_pr.get(gt_id, [])
+        if (pred_id in current_temporal_match):
+            return True
 
         return False
 

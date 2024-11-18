@@ -6,6 +6,8 @@ from . import linear_assignment
 from . import iou_matching
 from .track import Track
 
+nn_margin = 0.2
+
 
 class Tracker:
     """
@@ -37,16 +39,19 @@ class Tracker:
 
     """
 
-    def __init__(self, metric, max_iou_distance=0.7, max_age=30, n_init=3, print_cost_matrix=False):
+    def __init__(self, metric, max_iou_distance=0.7, max_age=30, n_init=3, print_cost_matrix=False, use_kalman=True, start_confirmed=False):
         self.metric = metric
         self.max_iou_distance = max_iou_distance
         self.max_age = max_age
+        # self.max_age = 1000
         self.n_init = n_init
         self.print_cost_matrix = print_cost_matrix
 
         self.kf = kalman_filter.KalmanFilter()
         self.tracks = []
         self._next_id = 1
+        self.use_kalman = use_kalman
+        self.start_confirmed = start_confirmed
 
         self.metrics = {
             "removed": 0,
@@ -76,12 +81,22 @@ class Tracker:
         # Run matching cascade.
         matches, unmatched_tracks, unmatched_detections = \
             self._match(detections)
-
+        # if (len(matches) > 0):
+        #     import pdb
+        #     pdb.set_trace()
         # Update track set.
         for track_idx, detection_idx in matches:
+            # track_bb = self.tracks[track_idx].get_detection().to_tlbr()
+            # detection_bb = detections[detection_idx].to_tlbr()
+            # import pdb
+            # pdb.set_trace()
+            # print("matched_id: ", track_idx, detection_idx)
+            # print("OG: ", track_bb)
+            # print("DET:", detection_bb)
             self.tracks[track_idx].update(
                 self.kf, detections[detection_idx])
             matched_id = self.tracks[track_idx].track_id
+
             if (matched_id in self.metrics["id_frames"]):
                 self.metrics["id_frames"][matched_id] += 1
             else:
@@ -118,9 +133,14 @@ class Tracker:
             # features = [dets[i].feature for i in detection_indices]
             # targets = [tracks[i].track_id for i in track_indices]
             cost_matrix = self.metric.distance(features, targets)
-            cost_matrix = linear_assignment.gate_cost_matrix(
-                self.kf, cost_matrix, tracks, dets, track_indices,
-                detection_indices)
+           # cost_matrix[cost_matrix<0.5] =
+            cost_matrix = linear_assignment.gate_cost_neural(
+                cost_matrix, nn_margin)
+            if (self.use_kalman):
+                cost_matrix = linear_assignment.gate_cost_matrix(
+                    self.kf, cost_matrix, tracks, dets, track_indices,
+                    detection_indices)
+
             if (self.print_cost_matrix):
                 print("Cost Matrix:", cost_matrix)
 
@@ -138,7 +158,7 @@ class Tracker:
             linear_assignment.matching_cascade(
                 gated_metric, self.metric.matching_threshold, self.max_age,
                 self.tracks, detections, confirmed_tracks)
-        # print(matches_a, "SKIP CONFIRMED")
+        # print(matches_a, "Matches")
 
         # Associate remaining tracks together with unconfirmed tracks using IOU.
         iou_track_candidates = unconfirmed_tracks + [
@@ -165,6 +185,6 @@ class Tracker:
         mean, covariance = self.kf.initiate(detection.to_xyah())
         self.tracks.append(Track(
             mean, covariance, self._next_id, self.n_init, self.max_age,
-            detection.feature, detection))
+            detection.feature, detection, use_kalman=self.use_kalman, start_confirmed=self.start_confirmed))
         self._next_id += 1
         self.metrics["new_ids"] += 1
