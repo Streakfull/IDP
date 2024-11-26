@@ -177,7 +177,7 @@ class Tracker:
         for element in matches_a:
             track_idx = element[0]
             matched_track_ids.append(self.tracks[track_idx].track_id)
-        print("Appeance Matched IDs: ", [matched_track_ids])
+        # print("Appeance Matched IDs: ", [matched_track_ids])
         unmatched_tracks = list(set(unmatched_tracks_a + unmatched_tracks_b))
         return matches, unmatched_tracks, unmatched_detections
 
