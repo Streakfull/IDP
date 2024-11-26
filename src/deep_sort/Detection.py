@@ -35,6 +35,8 @@ class Detection(object):
         # self.feature = np.asarray(feature, dtype=np.float32)
         self.feature = np.ones(128)
         self.classif = cls
+        self.id = None
+        self.xyxy = np.array([x1, y1, x2, y2])
 
     def to_tlbr(self):
         """Convert bounding box to format `(min x, min y, max x, max y)`, i.e.,
@@ -67,3 +69,6 @@ class Detection(object):
 
     def to_tlwh(self):
         return self.tlwh
+
+    def set_id(self, id):
+        self.id = id

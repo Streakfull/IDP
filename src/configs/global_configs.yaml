@@ -68,7 +68,7 @@ model:
     weight_init: None
     scheduler_step_size: 25
     scheduler_gamma: 0.5
-    use_visual: True
+    use_visual: False
   
 
 

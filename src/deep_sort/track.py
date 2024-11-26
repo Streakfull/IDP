@@ -73,6 +73,7 @@ class Track:
         self.time_since_update = 0
         self.detection = detection
         self.use_kalman = use_kalman
+        self.detection.set_id(self.track_id)
 
         self.state = TrackState.Tentative
         if (start_confirmed):
@@ -152,6 +153,7 @@ class Track:
         self.features.append(detection.feature)
         if (not self.use_kalman):
             self.detection = detection
+        detection.set_id(self.track_id)
 
         self.hits += 1
         self.time_since_update = 0

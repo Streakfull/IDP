@@ -25,6 +25,7 @@ from ultralytics.engine.results import Results
 import copy
 from pytorchmodels.Siamese import Siamese
 import yaml
+import os
 
 k_200 = "../logs/training/siamese-lin-bn-conv/200k-samples/2024_11_13_02_07_53/checkpoints/epoch-best.ckpt"
 k_30 = "../logs/training/siamese-lin-bn-conv/full-ds-2/2024_11_12_19_50_03/checkpoints/epoch-best.ckpt"
@@ -60,7 +61,7 @@ class DeepSortObjectTrackingSiamese(ObjectDetection):
         self.nn_budget = None
         self.write_path = write_path
         self.frame_count = 0
-        self.siamese_ckpt_path = visual_100k
+        self.siamese_ckpt_path = random_200k
         self.configs_path = "./configs/global_configs.yaml"
         self.use_kalman = use_kalman
         self.start_confirmed = start_confirmed
@@ -177,8 +178,8 @@ class DeepSortObjectTrackingSiamese(ObjectDetection):
 
                 detections = self.get_detections_objects(det, img)
 
-                detections = [
-                    d for d in detections if d.confidence >= self.min_confidence]
+                # detections = [
+                #     d for d in detections if d.confidence >= self.min_confidence]
 
                 tracker.predict()
                 tracker.update(detections)
@@ -263,9 +264,20 @@ class DeepSortObjectTrackingSiamese(ObjectDetection):
                 features = self.get_visual_crop_features(det, frame)
             else:
                 with torch.no_grad():
-                    features = self.siamese_network.network.backbone(features)
+                    if len(features) > 0:
+                        if (len(features.shape) == 1):
+                            features = features.unsqueeze(dim=0)
+                        try:
+                            self.siamese_network.eval()
+                            features = self.siamese_network.network.backbone(
+                                features)
+                        except:
+                            import pdb
+                            pdb.set_trace()
             # import pdb
         # pdb.set_trace()
+        if (len(features.shape) == 1):
+            features = features.unsqueeze(dim=0)
         try:
             for i in range(len(features)):
                 feat = features[i]
@@ -300,7 +312,7 @@ class DeepSortObjectTrackingSiamese(ObjectDetection):
 
         cls = det.boxes.cls.unsqueeze(1)
         conf = det.boxes.conf.unsqueeze(1)
-        detections = torch.cat((boxes, conf, cls), dim=1)
+        detections = torch.cat((boxes, conf, cls), dim=1).cpu()
         return detections
 
     def get_frame_diff(self, stored_metrics, new_metrics):
@@ -330,3 +342,66 @@ class DeepSortObjectTrackingSiamese(ObjectDetection):
             }
 
         return None
+
+    def process_pairwise_frames(self, ds,
+                                write_path,
+                                max_length=None):
+
+        metric = nn_matching.NearestNeighborDistanceMetric(
+            "cosine", self.max_cosine_distance, None)
+        total_ds = len(ds)
+        frame_labels = []
+        current_idx = 0
+        if (max_length is not None):
+            total_ds = max_length
+        with tqdm(total=total_ds-1, desc="Processing ds", unit="data") as pbar:
+            for i in range(total_ds):
+                e = ds[current_idx]
+                f1, f2, x1, x2 = e["f1"], e["f2"], e["x1"], e["x2"]
+                tup = [(f1, x1), (f2, x2)]
+                tracker = Tracker(
+                    metric,
+                    print_cost_matrix=False,
+                    use_kalman=self.use_kalman,
+                    start_confirmed=self.start_confirmed,
+                    max_age=1)
+                for j in range(len(tup)):
+                    fr, img = tup[j]
+                    det = self.predict(img)
+                    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+
+                    detections = self.get_detections_objects(det, img)
+
+                    # detections = [
+                    #     d for d in detections if d.confidence >= self.min_confidence]
+                    results = []
+                    features = []
+                    tracker.predict()
+                    tracker.update(detections)
+                    for detection in detections:
+                        bbox = detection.to_tlbr()
+                        conf = detection.get_conf()
+                        cls = detection.get_cls()
+                        cls = cls.cpu().numpy()
+                        cls = np.array([cls])
+                        conf = np.array([conf])
+                        id = np.array([detection.id])
+                        result = np.concatenate((bbox, conf, cls, id))
+                        results.append(result)
+                    frames = self.plot_boxes(results, img)
+                    frame_name = f"frame_{fr}"
+                    frame_labels.append(results)
+                    # features.append(tracks_feat)
+                    fmt = ['%.4f'] * (result.shape[0] - 1) +\
+                        ['%d'] if len(results) > 0 else '%d'
+                    dir_path = f"{write_path}/{f1}_{f2}"
+                    os.makedirs(dir_path, exist_ok=True)
+                    np.savetxt(f"{dir_path}/{fr}.txt",
+                               results, delimiter=' ', fmt=fmt)
+                    cv2.imwrite(f"{dir_path}/{fr}.jpg",
+                                frames)
+
+                pbar.update(1)
+                if (current_idx >= total_ds):
+                    break
+                current_idx += 1
