@@ -43,9 +43,10 @@ class VisualSimMatches(BaseDataSet):
         x2_img = self.transform(x2_img)
 
         # Load feature vectors (e.g., numpy arrays)
-        x1f = np.loadtxt(feature_path_x1)[5:]
-        x2f = np.loadtxt(feature_path_x2)[5:]
-
+        # x1f = np.loadtxt(feature_path_x1)[5:]
+        # x2f = np.loadtxt(feature_path_x2)[5:]
+        x1f = np.loadtxt(feature_path_x1)
+        x2f = np.loadtxt(feature_path_x2)
         # Convert the features to tensors
         # x1f = torch.tensor(x1f, dtype=torch.float32)
         # x2f = torch.tensor(x2f, dtype=torch.float32)
@@ -69,8 +70,8 @@ class VisualSimMatches(BaseDataSet):
         # Move the images and feature tensors to the specified device (e.g., 'cuda:0' or 'cpu')
         batch["x1_img"] = batch["x1_img"].to(device)
         batch["x2_img"] = batch["x2_img"].to(device)
-        batch["x1f"] = batch["x1f"].to(device)
-        batch["x2f"] = batch["x2f"].to(device)
+        batch["x1f"] = batch["x1f"].float().to(device)
+        batch["x2f"] = batch["x2f"].float().to(device)
         batch["label"] = batch["label"].long().to(device)
 
         return batch

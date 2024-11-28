@@ -102,14 +102,14 @@ class ModelTrainer:
 
             intial_pass = epoch == 0 and iteration == 0
             # visualization step
-            # if (iteration % self.training_config["visualize_every"] == (self.training_config["visualize_every"] - 1) or intial_pass):
-            # visuals = self.model.prepare_visuals()
-            # model_field = self.global_configs["model"]["model_field"]
-            # if (model_field == "vgg"):
-            #     text = self.model.prepare_text_visuals()
-            #     self.logger.log_text(
-            #         tag=f"Train/Predicions", text=text, iteration=iteration)
-            # self.visualizer.visualize(visuals, epoch, iteration)
+            if (iteration % self.training_config["visualize_every"] == (self.training_config["visualize_every"] - 1) or intial_pass):
+                m, um = self.model.prepare_visuals()
+                if m is not None:
+                    self.logger.log_grid_images("Train/Matches", m, iteration)
+                if um is not None:
+                    self.logger.log_grid_images(
+                        "Train/Non-Matches", um, iteration)
+               # self.visualizer.visualize(visuals, epoch, iteration)
 
             # log writer
             if iteration % self.training_config['print_every'] == (self.training_config['print_every'] - 1) or (

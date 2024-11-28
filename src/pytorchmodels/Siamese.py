@@ -6,6 +6,7 @@ from torch import optim
 from lutils.model_utils import init_weights
 from losses.constrastive_loss import ContrastiveLoss
 from blocks.visual_siamese_network import VisualSiameseNetwork
+from blocks.visual_siamese_features import VisualSiameseNetworkFeatures
 
 
 class Siamese(BaseModel):
@@ -15,7 +16,8 @@ class Siamese(BaseModel):
         self.configs = configs
         init_type = self.configs['weight_init']
         self.use_visual = self.configs['use_visual']
-        self.network = SiameseNetwork() if not self.use_visual else VisualSiameseNetwork()
+        self.use_combined = self.configs['use_combined']
+        self.network = self.build_network()
         if (init_type != "None"):
             print("Initializing model weights with %s initialization" % init_type)
             self.init_weights()
@@ -83,3 +85,51 @@ class Siamese(BaseModel):
 
     def name(self):
         return 'SiameseFCNetwork'
+
+    def prepare_visuals(self):
+
+        # Compute softmax predictions and get match/non-match classifation
+        pred = torch.nn.functional.sigmoid(self.pred)
+        matches = pred > 0.5  # Assuming index 1 corresponds to "match"
+
+        # Get images
+        imgs_a = self.network.img1  # Tensor: (batch_size, C, H, W)
+        imgs_b = self.network.img2  # Tensor: (batch_size, C, H, W)
+
+        # Initialize lists for storing match and non-match images
+        match_images = []
+        non_match_images = []
+
+        # Iterate over the batch
+        for i in range(len(imgs_a)):
+            img_a = imgs_a[i]
+            img_b = imgs_b[i]
+
+            # Combine img_a and img_b side by side
+            # Concatenate along width (dim=2)
+            combined_img = torch.cat((img_a, img_b), dim=2)
+
+            if matches[i]:  # If it's a match
+                match_images.append(combined_img)
+            else:  # If it's a non-match
+                non_match_images.append(combined_img)
+
+        # Check if there are any match images to log
+        if match_images:
+            match_images_tensor = torch.stack(match_images)
+
+        else:
+            print("No match images to log")
+
+        # Check if there are any non-match images to log
+        if non_match_images:
+            non_match_images_tensor = torch.stack(non_match_images)
+
+        return match_images, non_match_images
+
+    def build_network(self):
+        if self.use_combined:
+            return VisualSiameseNetworkFeatures()
+        if self.use_visual:
+            return VisualSiameseNetwork()
+        return SiameseNetwork()

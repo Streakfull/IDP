@@ -99,6 +99,33 @@ def get_img_crop_from_frame(box, frame, crop_size=(225, 225)):
     return img
 
 
+def get_img_crop_from_frame_no_padding(box, frame):
+    """
+    Extract the cropped image from the frame based on the bounding box.
+    The crop will fit exactly to the bounding box dimensions without resizing.
+
+    Args:
+        box (tuple): The bounding box defined as (x_min, y_min, x_max, y_max).
+        frame (numpy.ndarray): The image frame as a NumPy array.
+
+    Returns:
+        PIL.Image.Image: The cropped image as a PIL Image.
+    """
+    # Convert bounding box coordinates to integers
+    left = int(max(0, box[0]))  # x_min
+    top = int(max(0, box[1]))   # y_min
+    right = int(min(frame.shape[1], box[2]))  # x_max
+    bottom = int(min(frame.shape[0], box[3]))  # y_max
+
+    # Crop the image
+    crop = frame[top:bottom, left:right]
+
+    # Convert the cropped region to a PIL Image
+    img = Image.fromarray(crop)
+
+    return img
+
+
 def map_to_conf_json(dir_files):
     return [f"conf-{x}.json" for x in dir_files]
 

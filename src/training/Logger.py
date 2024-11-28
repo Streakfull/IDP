@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from torchinfo import summary
 from typing import Any
+from torchvision.utils import make_grid
 
 from cprint import *
 from torch.utils.tensorboard import SummaryWriter
@@ -97,8 +98,11 @@ class Logger:
         self._writer.add_images(tag=tag, img_tensor=img,
                                 global_step=iteration, dataformats="NHWC",
 
-
                                 )
 
     def log_text(self, tag, text, iteration):
         self._writer.add_text(tag=tag, text_string=text, global_step=iteration)
+
+    def log_grid_images(self, tag, img, iteration):
+        self._writer.add_images(tag, make_grid(
+            img, nrow=4), global_step=iteration, dataformats="CHW")

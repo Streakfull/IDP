@@ -46,7 +46,7 @@ class DataLoaderHandler:
 
     @staticmethod
     def train_val_dataset(dataset, test_size):
-        # return dataset, dataset
+        return dataset, dataset
         if (len(dataset) == 1):
             return dataset, dataset
         train_idx, val_idx = train_test_split(
