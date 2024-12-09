@@ -182,6 +182,8 @@ class NearestNeighborDistanceMetric(object):
                 self.samples[target] = self.samples[target][-self.budget:]
         self.samples = {k: self.samples[k] for k in active_targets}
 
+    # def set_samples(tracks):
+
     def distance(self, features, targets):
         """Compute distance between features and targets.
 

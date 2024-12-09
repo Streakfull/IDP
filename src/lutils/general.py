@@ -1,3 +1,5 @@
+import re
+from tqdm import tqdm
 import matplotlib.pyplot as plt
 from IPython.display import display
 import os
@@ -265,12 +267,6 @@ def f1_scores(precision_recall_data):
 
 
 def plot_f1_scores(f1_scores):
-    """
-    Plot F1 scores for different methods.
-
-    Args:
-        f1_scores (dict): A dictionary where keys are labels and values are lists of F1 scores.
-    """
     plt.figure(figsize=(10, 6))
 
     for label, scores in f1_scores.items():
@@ -282,4 +278,199 @@ def plot_f1_scores(f1_scores):
     plt.ylabel("F1 Score")
     plt.legend()
     plt.grid()
+    plt.show()
+
+
+def extract_frame_number(file_path):
+    match = re.search(r'frame_(\d+)', file_path)
+    return int(match.group(1)) if match else None
+
+
+def find_object_by_id(objects, target_id):
+    for obj in objects:
+        if obj.id == target_id:
+            return obj
+    return None
+
+
+def create_image_grids(input_dir, output_dir, grid_size=32, pairs_per_row=4):
+    """
+    Creates grids of image pairs (bba_x and bbb_x) with a specified number of pairs per row and saves them.
+
+    Args:
+        input_dir (str): Directory containing the folders with bba and bbb images.
+        output_dir (str): Directory to save the output grids.
+        grid_size (int): Number of pairs per grid (default is 8).
+        pairs_per_row (int): Number of pairs per row in the grid (default is 4).
+    """
+    # Ensure the output directory exists
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Collect and sort files
+    bba_files = sorted([os.path.join(root, file) for root, _, files in os.walk(
+        input_dir) for file in files if "bba_" in file])
+    bbb_files = sorted([os.path.join(root, file) for root, _, files in os.walk(
+        input_dir) for file in files if "bbb_" in file])
+
+    # Pair files based on index
+    pairs = list(zip(bba_files, bbb_files))
+
+    # Process pairs into grids
+    for grid_idx in range(0, len(pairs), grid_size):
+        grid_pairs = pairs[grid_idx:grid_idx + grid_size]
+
+        # Determine grid dimensions
+        rows = (len(grid_pairs) + pairs_per_row - 1) // pairs_per_row
+        pair_width, pair_height = Image.open(grid_pairs[0][0]).size
+        grid_width = pair_width * 2 * pairs_per_row  # Each pair has 2 images
+        grid_height = pair_height * rows
+
+        # Create an empty canvas for the grid
+        grid_image = Image.new("RGB", (grid_width, grid_height))
+
+        # Add pairs to the grid
+        for i, (bba_path, bbb_path) in enumerate(grid_pairs):
+            row = i // pairs_per_row
+            col = i % pairs_per_row
+
+            # Get the images
+            bba_img = Image.open(bba_path)
+            bbb_img = Image.open(bbb_path)
+
+            # Combine the pair side by side
+            combined = Image.new("RGB", (pair_width * 2, pair_height))
+            combined.paste(bba_img, (0, 0))
+            combined.paste(bbb_img, (pair_width, 0))
+
+            # Paste the combined image into the grid
+            x_offset = col * pair_width * 2
+            y_offset = row * pair_height
+            grid_image.paste(combined, (x_offset, y_offset))
+
+        # Save the grid
+        grid_filename = os.path.join(
+            output_dir, f"grid_{grid_idx // grid_size + 1}.png")
+        grid_image.save(grid_filename)
+        print(f"Saved grid: {grid_filename}")
+
+
+def find_non_empty_logs(base_dir, fname="fn_log.txt"):
+    """
+    Searches through all directories within the given directory and finds folders
+    that contain a non-empty 'fn_log.txt'.
+
+    Args:
+        base_dir (str): The path to the base directory to search.
+
+    Returns:
+        list: A list of parent folder names containing non-empty 'fn_log.txt'.
+    """
+    non_empty_folders = []
+    # Walk through all directories and files in the base directory
+    for root, dirs, files in os.walk(base_dir):
+        # Check if 'fn_log.txt' exists in the current folder
+        if fname in files:
+            fn_log_path = os.path.join(root, fname)
+
+            # Check if the file is non-empty
+            if os.path.getsize(fn_log_path) > 0:
+                # Add the parent folder name to the result
+                parent_folder = os.path.basename(root)
+                non_empty_folders.append(parent_folder)
+
+    return non_empty_folders
+
+
+def read_fn_logs_as_arrays(base_dir, folder_names):
+    """
+    Reads the 'fn_log.txt' files in the given folders and parses them as NumPy arrays.
+
+    Args:
+        base_dir (str): The base directory containing the folders.
+        folder_names (list): A list of folder names to search for 'fn_log.txt'.
+
+    Returns:
+        dict: A dictionary where keys are folder names and values are NumPy arrays of tuples from 'fn_log.txt'.
+    """
+    fn_logs_data = {}
+
+    for folder_name in folder_names:
+        folder_path = os.path.join(base_dir, folder_name)
+        fn_log_path = os.path.join(folder_path, 'fn_log.txt')
+
+        # Check if the 'fn_log.txt' exists
+        if os.path.exists(fn_log_path):
+            try:
+                # Read the file and parse as a NumPy array
+                with open(fn_log_path, 'r') as f:
+                    lines = f.readlines()
+                    # Convert lines to tuples and store in NumPy array
+                    data = np.array([eval(line.strip())
+                                    for line in lines], dtype=np.int64)
+                    fn_logs_data[folder_name] = data
+            except Exception as e:
+                print(f"Error reading file '{fn_log_path}': {e}")
+                fn_logs_data[folder_name] = None
+        else:
+            print(f"Warning: 'fn_log.txt' not found in {folder_path}")
+            fn_logs_data[folder_name] = None
+
+    return fn_logs_data
+
+
+def calculate_precision_recall(confusion_matrix_dir):
+    methods_data = {"yoloVis": [], "vis": [], "yolo": []}
+
+    for method in methods_data.keys():
+        method_dir = os.path.join(confusion_matrix_dir, method)
+        for threshold_folder in os.listdir(method_dir):
+            threshold_dir = os.path.join(method_dir, threshold_folder)
+            confusion_file = os.path.join(
+                threshold_dir, "confusion_matrix", 'confusion_matrix.json')
+            print(confusion_file, "FILE")
+            # Check if the confusion_matrix.json exists
+            if os.path.exists(confusion_file):
+                with open(confusion_file, 'r') as f:
+                    confusion_matrix = json.load(f)
+
+                tp = confusion_matrix.get('tp', 0)
+                fp = confusion_matrix.get('fp', 0)
+                fn = confusion_matrix.get('fn', 0)
+                tn = confusion_matrix.get('tn', 0)
+
+                # Calculate Precision and Recall
+                precision = tp / (tp + fp) if (tp + fp) != 0 else 1
+                recall = tp / (tp + fn) if (tp + fn) != 0 else 0
+
+                # Append data for each method at this threshold
+                methods_data[method].append(
+                    (float(threshold_folder), precision, recall))
+
+    return methods_data
+    import matplotlib.pyplot as plt
+
+
+def plot_pr_curve(methods_data):
+    plt.figure(figsize=(8, 6))
+
+    # Plot for each method
+    for method, data in methods_data.items():
+        # Sort the data by recall (the second element in each tuple)
+        sorted_data = sorted(data, key=lambda x: x[2])  # Sort by recall (x[2])
+
+        # Unzip sorted data for plotting
+        thresholds, precision, recall = zip(*sorted_data)
+
+        # Plot the precision vs recall curve for this method
+        plt.plot(recall, precision, label=method, marker='o')
+
+    # Add labels and title
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.title('Matching Pairwise Frames PR')
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+
+    # Show and save the plot
     plt.show()

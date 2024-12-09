@@ -108,3 +108,24 @@ class VisualSiameseNetworkFeatures(nn.Module):
         img = img.flatten(start_dim=1)
         img = self.bn_resnet(img)
         return img
+
+    def img_feature_no_bn(self, img):
+        img = self.resnet(img)
+        img = img.flatten(start_dim=1)
+        return img
+
+    def bb_features(self, bb):
+        return self.backbone_bb(bb)
+
+    def classif(self, x1, x2):
+        x1c = x1.unsqueeze(1)
+        x2c = x2.unsqueeze(1)
+        fc = torch.cat((x1c, x2c), dim=1)
+        last_dim = fc.shape[-1]
+        conv_dim = int(np.sqrt(last_dim))
+        fc = rearrange(fc, 'bs ch (w h) -> bs ch w h', w=conv_dim, h=conv_dim)
+        fc = self.comb(fc)
+        fc = fc.flatten(start_dim=1)
+        fc = self.cls(fc)
+        fc = torch.nn.functional.sigmoid(fc)
+        return fc

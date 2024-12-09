@@ -6,9 +6,8 @@ from torchvision import models
 
 
 class VisualSiameseNetwork(nn.Module):
-
     def __init__(self) -> None:
-        super(VisualSiameseNetwork, self).__init__()
+        super().__init__()
         self.resnet = self.load_resnet()
 
         self.backbone = nn.Sequential(
@@ -63,7 +62,6 @@ class VisualSiameseNetwork(nn.Module):
         self.cls = nn.Linear(4096, 1)
 
     def forward(self, x):
-
         x1 = x["x1_img"]
         x2 = x["x2_img"]
         self.img1 = x1.detach()

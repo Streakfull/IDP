@@ -62,8 +62,8 @@ class SiameseNetwork(nn.Module):
 
     def forward(self, x):
 
-        x1 = x["x1"]
-        x2 = x["x2"]
+        x1 = x["x1f"]
+        x2 = x["x2f"]
         x1 = self.backbone(x1)
         x2 = self.backbone(x2)
         x1c = x1.unsqueeze(1)
@@ -79,3 +79,6 @@ class SiameseNetwork(nn.Module):
 
     def img_feature(self, x):
         return self.backbone(x)
+
+    def bb_features(self, bb):
+        return self.backbone(bb)

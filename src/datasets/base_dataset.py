@@ -12,6 +12,7 @@ class BaseDataSet(torch.utils.data.Dataset):
         local_options_path = local_options.get("path", None)
         self.dataset_path = Path(
             local_options_path if local_options_path is not None else global_options["path"])
+        self.dataset_paths = []
         self.items = self.get_items()
 
     def get_items(self):

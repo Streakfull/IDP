@@ -142,6 +142,39 @@ def matching_cascade(
     return matches, unmatched_tracks, unmatched_detections
 
 
+def matching_cascade_no_max_age(
+        distance_metric, max_distance,  tracks, detections,
+        track_indices=None, detection_indices=None, cascade_depth=30):
+
+    if track_indices is None:
+        track_indices = list(range(len(tracks)))
+    if detection_indices is None:
+        detection_indices = list(range(len(detections)))
+
+    unmatched_detections = detection_indices
+    matches = []
+
+    for level in range(cascade_depth):
+        if len(unmatched_detections) == 0:  # No detections left
+            break
+        track_indices_l = [
+            k for k in track_indices
+        ]
+
+        if len(track_indices_l) == 0:  # Nothing to match at this level
+            continue
+
+        matches_l, _, unmatched_detections = \
+            min_cost_matching(
+                distance_metric, max_distance, tracks, detections,
+                track_indices_l, unmatched_detections)
+        matches += matches_l
+    unmatched_tracks = list(set(track_indices) -
+                            set(k for k, _ in matches))
+
+    return matches, unmatched_tracks, unmatched_detections
+
+
 def gate_cost_matrix(
         kf, cost_matrix, tracks, detections, track_indices, detection_indices,
         gated_cost=INFTY_COST, only_position=False):
