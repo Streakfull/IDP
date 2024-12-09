@@ -178,8 +178,8 @@ class DeepSortObjectTrackingSiamese(ObjectDetection):
 
                 detections = self.get_detections_objects(det, img)
 
-                # detections = [
-                #     d for d in detections if d.confidence >= self.min_confidence]
+                detections = [
+                    d for d in detections if d.confidence >= self.min_confidence]
 
                 tracker.predict()
                 tracker.update(detections)
