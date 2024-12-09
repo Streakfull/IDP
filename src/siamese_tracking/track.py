@@ -1,11 +1,11 @@
 # vim: expandtab:ts=4:sw=4
 
 
-from pytorchmodels.KalmanBoxTracker import KalmanBoxTracker
+from siamese_tracking.KalmanTracker import KalmanBoxTracker
 
 
 class Track:
-    def __init__(self, track_id, queue_size=30, feature=None, detection=None,):
+    def __init__(self, track_id, queue_size=10, feature=None, detection=None,):
         self.track_id = track_id
         self.detection = detection
         self.detection.set_id(self.track_id)

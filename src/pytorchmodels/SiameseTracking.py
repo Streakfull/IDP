@@ -35,13 +35,14 @@ transform = transforms.Compose([
 
 
 class SiameseTracking(ObjectDetection):
-    def __init__(self, capture, write_path, use_enhanced_tracking=False) -> None:
+    def __init__(self, capture, write_path, use_enhanced_tracking=False, track_queue_size=10) -> None:
         super().__init__(capture)
         self.min_confidence = 0.25
         self.max_cosine_distance = 0.2
         self.write_path = write_path
         self.frame_count = 0
         self.use_enhanced_tracking = use_enhanced_tracking
+        self.track_queue_size = track_queue_size
         with open(self.configs_path, "r") as in_file:
             self.global_configs = yaml.safe_load(in_file)
             self.siamese_configs = self.global_configs["model"]["siamese"]
@@ -215,12 +216,8 @@ class SiameseTracking(ObjectDetection):
         metric = nn_matching.NearestNeighborDistanceMetric(
             "cosine", self.max_cosine_distance, None)
         tracker = Tracker(
-            metric=metric, use_enhance=self.use_enhanced_tracking)
-        results = []
-        tracks_feat = []
-        plotted_frames = []
-        frame_labels = []
-        features = []
+            metric=metric, use_enhance=self.use_enhanced_tracking, track_queue_size=self.track_queue_size)
+
         with tqdm(total=total_frames-1, desc="Processing frames", unit="frame") as pbar:
             while True:
                 _, img = cap.read()
@@ -233,23 +230,37 @@ class SiameseTracking(ObjectDetection):
                 detections = self.get_detections_objects(det, img)
                 detections = [
                     d for d in detections if d.confidence >= self.min_confidence]
-                if (frame > 0):
-                    detections.pop()
                 pred_det = tracker.update(detections, self.frame_count)
                 if self.use_enhanced_tracking:
-                    print("KF Detection: ", len(pred_det))
+                    if (len(pred_det) > 0):
+                        print("KF Detection: ", len(pred_det))
                     detections = detections + pred_det
 
                 frames = self.plot_boxes(detections=detections, img=img)
                 frame_name = f"frame_{frame}"
+                results = []
+                tracks_feat = []
+                plotted_frames = []
+                frame_labels = []
+                features = []
+                for detection in detections:
+                    bbox = detection.to_tlbr()
+                    conf = detection.get_conf()
+                    cls = detection.get_cls()
+                    cls = cls.cpu().numpy()
+                    cls = np.array([cls])
+                    conf = np.array([conf])
+                    id = np.array([detection.id])
+                    result = np.concatenate((bbox, conf, cls, id))
+                    results.append(result)
                 frame_labels.append(results)
                 features.append(tracks_feat)
 
-                # if (labels_write_path is not None):
-                #     fmt = ['%.4f'] * (result.shape[0] - 1) +\
-                #         ['%d'] if len(results) > 0 else '%d'
-                #     np.savetxt(f"{labels_write_path}/{frame_name}.txt",
-                #                results, delimiter=' ', fmt=fmt)
+                if (labels_write_path is not None and len(results) > 0):
+                    fmt = ['%.4f'] * (results[0].shape[0] - 1) +\
+                        ['%d'] if len(results) > 0 else '%d'
+                    np.savetxt(f"{labels_write_path}/{frame_name}.txt",
+                               results, delimiter=' ', fmt=fmt)
                 if write_directly:
                     f = cv2.imwrite(f"{write_path}/{frame_name}.jpg", frames)
                 else:

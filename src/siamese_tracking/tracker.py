@@ -14,13 +14,14 @@ nn_margin = 0.2
 
 class Tracker:
 
-    def __init__(self, metric, max_iou_distance=0.7, use_enhance=False):
+    def __init__(self, metric, max_iou_distance=0.7, use_enhance=False, track_queue_size=10):
         self.tracks = []
         self.tracken_map = {}
         self._next_id = 1
         self.metric = metric
         self.max_iou_distance = max_iou_distance
         self.use_enhance = use_enhance
+        self.track_queue_size = track_queue_size
 
     def update(self, detections, current_frame):
         # Get cost matrix between detections and all tracks
@@ -59,16 +60,20 @@ class Tracker:
         predicted_det = []
         for tr in unmatched_tracks_t:
             track_id = self.tracks[tr].track_id
+            if not track_id in self.tracken_map.keys():
+                continue
             track = self.tracken_map[track_id]
             track.n_miss += 1
             if (track.n_miss > 3):
                 continue
+           # track.kf.update(track.detection.to_tlbr())
             pred = track.kf.predict().flatten()
             sc = [0.5, 0]
             pred = np.append(pred, sc)
             det = Detection(torch.Tensor(pred))
             det.set_id(track_id)
             predicted_det.append(det)
+           # predicted_det.append(track.detection)
 
         return predicted_det
 
@@ -110,7 +115,8 @@ class Tracker:
     def _initiate_track(self, detection):
         track = Track(
             self._next_id,
-            detection=detection
+            detection=detection,
+            queue_size=self.track_queue_size
         )
 
         self.tracks.append(track)

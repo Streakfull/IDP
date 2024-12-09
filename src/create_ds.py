@@ -26,7 +26,8 @@ import numpy as np
 import os
 import json
 import cv2
-write_path = "../logs/tracking/manCityVsLiverpool/clip_1/week8/simple_tracking_2/frames"
+write_path = "../logs/tracking/manCityVsLiverpool/clip_1/week9/enhanced_tracking/frames"
+labels_write_path = "../logs/tracking/manCityVsLiverpool/clip_1/week9/enhanced_tracking/labels"
 write_path_deepsort = "../logs/tracking/manCityVsLiverpool/clip_1/week5/debug/frames"
 video_path = "./raw_dataset/mancityVsLiverpool/clip_1.mp4"
 write_path_crops = "../logs/tracking/manCityVsLiverpool/clip_1/week8/simple_tracking/crops"
@@ -69,9 +70,14 @@ def create():
 
 
 def write_video():
-    sim_tracker = SiameseTracking(video_path, write_path)
+    print("Writing video")
+    sim_tracker = SiameseTracking(
+        video_path, write_path, use_enhanced_tracking=True)
     y = sim_tracker.process_video(
-        video=video_path, write_path=write_path, start_frame=None, max_frames=None)
+        video=video_path, write_path=write_path,
+        start_frame=None,
+        max_frames=None,
+        labels_write_path=labels_write_path)
 
 
 if __name__ == "__main__":
