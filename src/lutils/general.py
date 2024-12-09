@@ -293,6 +293,13 @@ def find_object_by_id(objects, target_id):
     return None
 
 
+def find_object_by_track_id(objects, target_id):
+    for obj in objects:
+        if obj.track_id == target_id:
+            return obj
+    return None
+
+
 def create_image_grids(input_dir, output_dir, grid_size=32, pairs_per_row=4):
     """
     Creates grids of image pairs (bba_x and bbb_x) with a specified number of pairs per row and saves them.

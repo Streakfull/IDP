@@ -35,12 +35,13 @@ transform = transforms.Compose([
 
 
 class SiameseTracking(ObjectDetection):
-    def __init__(self, capture, write_path) -> None:
+    def __init__(self, capture, write_path, use_enhanced_tracking=False) -> None:
         super().__init__(capture)
         self.min_confidence = 0.25
         self.max_cosine_distance = 0.2
         self.write_path = write_path
         self.frame_count = 0
+        self.use_enhanced_tracking = use_enhanced_tracking
         with open(self.configs_path, "r") as in_file:
             self.global_configs = yaml.safe_load(in_file)
             self.siamese_configs = self.global_configs["model"]["siamese"]
@@ -147,14 +148,12 @@ class SiameseTracking(ObjectDetection):
             id = detection.id
             conf = detection.confidence
             w, h = x2-x1, y2-y1
-
-            if (conf > 0.25):
-                # cvzone.putTextRect(
-                #     img, f'{id}, {conf}', (x1, y1), scale=1, thickness=1, colorR=(0, 0, 255))
-                cvzone.putTextRect(
-                    img, f'{id}', (x1, y1-5), scale=1, thickness=1, colorR=(0, 0, 255))
-                cvzone.cornerRect(img, (x1, y1, w, h), l=9,
-                                  rt=1, colorR=(255, 0, 255))
+            # cvzone.putTextRect(
+            #     img, f'{id}, {conf}', (x1, y1), scale=1, thickness=1, colorR=(0, 0, 255))
+            cvzone.putTextRect(
+                img, f'{id}', (x1, y1-5), scale=1, thickness=1, colorR=(0, 0, 255))
+            cvzone.cornerRect(img, (x1, y1, w, h), l=9,
+                              rt=1, colorR=(255, 0, 255))
         # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         return img
 
@@ -215,7 +214,8 @@ class SiameseTracking(ObjectDetection):
 
         metric = nn_matching.NearestNeighborDistanceMetric(
             "cosine", self.max_cosine_distance, None)
-        tracker = Tracker(metric=metric)
+        tracker = Tracker(
+            metric=metric, use_enhance=self.use_enhanced_tracking)
         results = []
         tracks_feat = []
         plotted_frames = []
@@ -233,7 +233,13 @@ class SiameseTracking(ObjectDetection):
                 detections = self.get_detections_objects(det, img)
                 detections = [
                     d for d in detections if d.confidence >= self.min_confidence]
-                tracker.update(detections)
+                if (frame > 0):
+                    detections.pop()
+                pred_det = tracker.update(detections, self.frame_count)
+                if self.use_enhanced_tracking:
+                    print("KF Detection: ", len(pred_det))
+                    detections = detections + pred_det
+
                 frames = self.plot_boxes(detections=detections, img=img)
                 frame_name = f"frame_{frame}"
                 frame_labels.append(results)

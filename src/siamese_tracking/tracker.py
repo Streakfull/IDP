@@ -1,9 +1,12 @@
 import numpy as np
+import torch
 from deep_sort import linear_assignment
 
 from deep_sort.iou_matching import iou_cost
+from siamese_tracking.Detection import Detection
 from siamese_tracking.track import Track
 from deep_sort import iou_matching
+from lutils.general import find_object_by_track_id
 
 
 nn_margin = 0.2
@@ -11,13 +14,15 @@ nn_margin = 0.2
 
 class Tracker:
 
-    def __init__(self, metric, max_iou_distance=0.7):
+    def __init__(self, metric, max_iou_distance=0.7, use_enhance=False):
         self.tracks = []
+        self.tracken_map = {}
         self._next_id = 1
         self.metric = metric
         self.max_iou_distance = max_iou_distance
+        self.use_enhance = use_enhance
 
-    def update(self, detections):
+    def update(self, detections, current_frame):
         # Get cost matrix between detections and all tracks
         matches, unmatched_tracks, unmatched_detections = \
             self._match(detections)
@@ -34,6 +39,38 @@ class Tracker:
             features += track.features
             targets += [track.track_id for _ in track.features]
         self.metric.partial_fit(features, targets, active_targets)
+        if (self.use_enhance):
+            pred_det = self.update_track_enhance_map(
+                detections, unmatched_tracks)
+            return pred_det
+
+        return None
+
+    def update_track_enhance_map(self, detections_t, unmatched_tracks_t):
+        # Matches ---> update previous map
+        for detection in detections_t:
+            track = self.tracken_map.get(detection.id, None)
+            if (track is None):
+                track = find_object_by_track_id(self.tracks, detection.id)
+                self.tracken_map[track.track_id] = track
+            track.n_miss = 0
+            track.kf.update(detection.to_tlbr())
+
+        predicted_det = []
+        for tr in unmatched_tracks_t:
+            track_id = self.tracks[tr].track_id
+            track = self.tracken_map[track_id]
+            track.n_miss += 1
+            if (track.n_miss > 3):
+                continue
+            pred = track.kf.predict().flatten()
+            sc = [0.5, 0]
+            pred = np.append(pred, sc)
+            det = Detection(torch.Tensor(pred))
+            det.set_id(track_id)
+            predicted_det.append(det)
+
+        return predicted_det
 
     def _match(self, detections):
         def gated_metric(tracks, dets, track_indices, detection_indices):
@@ -67,6 +104,7 @@ class Tracker:
         print("Appeance Matched IDs: ", len(
             matched_track_ids), [matched_track_ids])
         unmatched_tracks = list(set(unmatched_tracks_a + unmatched_tracks_b))
+
         return matches, unmatched_tracks, unmatched_detections
 
     def _initiate_track(self, detection):

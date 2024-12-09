@@ -9,7 +9,7 @@ class KalmanBoxTracker(object):
     """
     count = 0
 
-    def __init__(self, bbox):
+    def __init__(self, bbox, use_scores=True):
         """
         Initialises a tracker using initial bounding box.
         """
@@ -35,8 +35,12 @@ class KalmanBoxTracker(object):
         self.hits = 0
         self.hit_streak = 0
         self.age = 0
-        self.score = bbox[4]
-        self.classif = bbox[5]
+        if (use_scores):
+            self.score = bbox[4]
+            self.classif = bbox[5]
+        else:
+            self.score = None
+            self.classif = None
 
     def update(self, bbox):
         """
