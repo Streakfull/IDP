@@ -61,7 +61,7 @@ class DeepSortObjectTrackingSiamese(ObjectDetection):
         self.nn_budget = None
         self.write_path = write_path
         self.frame_count = 0
-        self.siamese_ckpt_path = random_200k
+        # self.siamese_ckpt_path = random_200k
         self.configs_path = "./configs/global_configs.yaml"
         self.use_kalman = use_kalman
         self.start_confirmed = start_confirmed
@@ -70,6 +70,7 @@ class DeepSortObjectTrackingSiamese(ObjectDetection):
 
         with open(self.configs_path, "r") as in_file:
             self.global_configs = yaml.safe_load(in_file)
+            self.siamese_configs = self.global_configs["model"]["siamese"]
         self.siamese_network = self.load_siamese()
 
     def load_model(self):
@@ -82,7 +83,8 @@ class DeepSortObjectTrackingSiamese(ObjectDetection):
     def load_siamese(self):
         configs = self.global_configs["model"]["siamese"]
         self.siamese_network = Siamese(configs)
-        self.siamese_network.load_ckpt(self.siamese_ckpt_path)
+        ckpt_path = self.global_configs["training"]["ckpt_path"]
+        self.siamese_network.load_ckpt(ckpt_path=ckpt_path)
         device = "cuda:0"
         self.siamese_network.to(device)
         return self.siamese_network
@@ -255,44 +257,96 @@ class DeepSortObjectTrackingSiamese(ObjectDetection):
                                   rt=1, colorR=(255, 0, 255))
         return img
 
+    # def get_detections_objects(self, det, frame):
+    #     results = self.get_full_pred(det)
+    #     features = det.feats
+    #     objects = list(map(Detection, results))
+    #     if (self.use_siamese):
+    #         if (self.use_visual_siamese):
+    #             features = self.get_visual_crop_features(det, frame)
+    #         else:
+    #             with torch.no_grad():
+    #                 if len(features) > 0:
+    #                     if (len(features.shape) == 1):
+    #                         features = features.unsqueeze(dim=0)
+    #                     try:
+    #                         self.siamese_network.eval()
+    #                         features = self.siamese_network.network.backbone(
+    #                             features)
+    #                     except:
+    #                         import pdb
+    #                         pdb.set_trace()
+
+    #     if (len(features.shape) == 1):
+    #         features = features.unsqueeze(dim=0)
+    #     try:
+    #         for i in range(len(features)):
+    #             feat = features[i]
+    #             detection = objects[i]
+    #             detection.set_feature(feat)
+    #     except:
+    #         import pdb
+    #         pdb.set_trace()
+    #     return objects
+
     def get_detections_objects(self, det, frame):
         results = self.get_full_pred(det)
         features = det.feats
         objects = list(map(Detection, results))
-        if (self.use_siamese):
-            if (self.use_visual_siamese):
-                features = self.get_visual_crop_features(det, frame)
-            else:
-                with torch.no_grad():
-                    if len(features) > 0:
-                        if (len(features.shape) == 1):
-                            features = features.unsqueeze(dim=0)
-                        try:
-                            self.siamese_network.eval()
-                            features = self.siamese_network.network.backbone(
-                                features)
-                        except:
-                            import pdb
-                            pdb.set_trace()
-            # import pdb
-        # pdb.set_trace()
-        if (len(features.shape) == 1):
-            features = features.unsqueeze(dim=0)
-        try:
-            for i in range(len(features)):
+        is_img_features = self.siamese_configs["use_visual"] or self.siamese_configs["use_combined"]
+        is_bb = self.siamese_configs["use_combined"] or self.siamese_configs["use_bb"]
+        if not self.use_siamese:
+            features = torch.ones_like(features)
+        else:
+            with torch.no_grad():
+                self.siamese_network.eval()
+                self.siamese_network.network.eval()
+                if is_img_features:
+                    img_features = self.get_visual_crop_features(det, frame)
+                if is_bb:
+                    bb_features = self.siamese_network.network.bb_features(
+                        features)
+
+            if (len(features.shape) == 1):
+                features = features.unsqueeze(dim=0)
+                if is_bb:
+                    bb_features = bb_features.unsqueeze(dim=0)
+                if is_img_features:
+                    img_features = img_features.unsqueeze(dim=0)
+        # try:
+        for i in range(len(features)):
+            if not self.use_siamese:
                 feat = features[i]
-                detection = objects[i]
-                detection.set_feature(feat)
-        except:
-            import pdb
-            pdb.set_trace()
+            if is_bb:
+                f = bb_features[i]
+                feat = f
+            if is_img_features:
+                img = img_features[i]
+                feat = img
+            if is_bb and is_img_features:
+                feat = torch.cat((img, f))
+
+            detection = objects[i]
+            detection.set_feature(feat)
         return objects
+
+    def convert_pil_bgr_to_rgb(self, pil_image):
+        # Convert PIL image to NumPy array
+        bgr_array = np.array(pil_image)
+
+        # Convert BGR to RGB by reversing the last axis
+        rgb_array = bgr_array[..., ::-1]
+
+        # Convert back to a PIL image
+        rgb_image = Image.fromarray(rgb_array, 'RGB')
+        return rgb_image
 
     def get_visual_crop_features(self, det, frame):
         boxes = det.boxes.xyxy
         features = []
         for box in boxes:
             img_crop = get_img_crop_from_frame(box, frame).convert('RGB')
+            img_crop = self.convert_pil_bgr_to_rgb(img_crop)
             img_crop = transform(img_crop)
             with torch.no_grad():
                 self.siamese_network.network.resnet.eval()
@@ -301,7 +355,8 @@ class DeepSortObjectTrackingSiamese(ObjectDetection):
                 feat = self.siamese_network.network.img_feature(
                     img_crop.to("cuda:0").unsqueeze(0))
                 features.append(feat.squeeze(0))
-        return features
+
+        return torch.stack(features, dim=0)
 
     def get_full_pred(self, det):
         try:

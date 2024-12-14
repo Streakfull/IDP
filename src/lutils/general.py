@@ -481,3 +481,24 @@ def plot_pr_curve(methods_data):
 
     # Show and save the plot
     plt.show()
+
+
+def filter_unique_by_id(objects):
+    """
+    Filters a list of objects to keep only those with unique `id` values.
+
+    Parameters:
+        objects (list): List of dictionaries, each with an `id` key.
+
+    Returns:
+        list: A list of objects with unique `id` values.
+    """
+    unique_objects = []
+    seen_ids = set()
+
+    for obj in objects:
+        if obj.id not in seen_ids:
+            unique_objects.append(obj)
+            seen_ids.add(obj.id)
+
+    return unique_objects

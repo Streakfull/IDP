@@ -8,7 +8,13 @@ from deep_sort import iou_matching
 
 
 class CalcMetrics():
-    def __init__(self, gt_path, predict_path, max_frames=None, max_iou_distance=0.7) -> None:
+    def __init__(self,
+                 gt_path,
+                 predict_path,
+                 max_frames=None,
+                 max_iou_distance=0.7,
+                 conf_threshold=None
+                 ) -> None:
         self.gt_path = gt_path
         self.predict_path = predict_path
         self.labels_gt = f"{self.gt_path}/labels"
@@ -27,6 +33,10 @@ class CalcMetrics():
         self.gt_count = 0
         self.tp_count = 0
         self.distances = 0
+        self.checked_id = 61
+        self.matching_id = 20000
+        self.distance = 0
+        self.conf_threshold = conf_threshold
 
     def run(self):
         print("Calculating")
@@ -55,10 +65,10 @@ class CalcMetrics():
         gt = np.loadtxt(f"{self.labels_gt}/frame_{f_idx}.txt")
         pred = np.loadtxt(f"{self.labels_pred}/frame_{f_idx}.txt")
         gt_det = self.construct_detections(gt)
-        pred_det = self.construct_detections(pred)
+        pred_det = self.construct_detections(pred, is_pred=True)
         return gt_det, pred_det
 
-    def construct_detections(self, outputs):
+    def construct_detections(self, outputs, is_pred=False):
         detections = []
         if outputs.ndim == 1 and len(outputs) > 0:
             row = outputs
@@ -68,6 +78,9 @@ class CalcMetrics():
             detection.time_since_update = 1
             detection.id = id
             detections.append(detection)
+            if is_pred and self.conf_threshold is not None:
+                detections = [det for det in detections if det.get_conf() >
+                              self.conf_threshold]
             return detections
         for row in outputs:
             bb = row[:-1]
@@ -76,7 +89,11 @@ class CalcMetrics():
             detection.time_since_update = 1
             detection.id = id
             detections.append(detection)
+        self.conf_threshold
 
+        if is_pred and self.conf_threshold is not None:
+            detections = [det for det in detections if det.get_conf() >
+                          self.conf_threshold]
         return detections
 
     def match_iou(self, gt, pred):
@@ -84,6 +101,26 @@ class CalcMetrics():
             linear_assignment.min_cost_matching(
                 iou_matching.iou_cost, self.max_iou_distance,
                 gt, pred)
+        # gt_ids = []
+        # pred_ids = []
+
+        # for k in gt:
+        #     gt_ids.append(k.id)
+        # for l in pred:
+        #     pred_ids.append(l.id)
+        # # if (self.frame == 229):
+        # #     import pdb
+        # #     pdb.set_trace()
+        # if (self.checked_id in gt_ids and self.checked_id in pred_ids):
+        #     gt_idx_1 = gt_ids.index(self.checked_id)
+        #     pred_idx_1 = pred_ids.index(self.checked_id)
+        #     for match in matches:
+        #         gt_p, pred_p = match
+        #         if (gt_p != gt_idx_1):
+        #             continue
+        #         if (pred_idx_1 != pred_p):
+        #             print(self.frame, "----->", pred_ids[pred_p])
+
         return matches, unmatched_gt, unmatched_pred
 
     def add_to_maps(self, matches, gt, pred):
@@ -162,6 +199,11 @@ class CalcMetrics():
         for match in matches:
             gt_id = gt[match[0]].id
             pred_id = pred[match[1]].id
+            # if (gt_id == self.checked_id and pred_id != self.matching_id):
+            #    # print(match)
+            #     # import pdb
+            #     # pdb.set_trace()
+            #     print(self.frame, match,  "----->", pred_id)
             if (gt_id in self.map_gt_pr_all):
                 self.map_gt_pr_all[gt_id].append(pred_id)
             else:
@@ -193,11 +235,14 @@ class CalcMetrics():
             "idsw": self.count_total_id_switchs(),
             "FP": self.fp_count,
             "FN": self.fn_count,
-            "MOTP": self.distance/self.tp_count
+            "MOTP": self.distance/(self.tp_count+np.finfo(float).eps),
+            "fragments": self.count_total_id_fragments(),
+            "id_switches_per_gt":  self.get_id_switches_map(),
+            # "gt_pr": self.map_gt_pr_all
 
         }
         results["MOTA"] = 1 - (results["FP"]+results["FN"] +
-                               results["idsw"])/results["GT"]
+                               results["idsw"])/(self.gt_count+np.finfo(float).eps)
         return results
         # results["mot"]
 
@@ -215,3 +260,27 @@ class CalcMetrics():
             if ids[i] != ids[i - 1]:  # Check if the current ID is different from the previous one
                 id_switches += 1
         return id_switches
+
+    def count_total_id_fragments(self):
+        id_fragments = 0
+        for gt_id, pred_ids in self.map_gt_pr_all.items():
+            id_fragments += self.count_id_fragments(pred_ids)
+        return id_fragments
+
+    def count_id_fragments(self, pred_ids):
+        fragments = 0
+        previous_id = None
+        for pred_id in pred_ids:
+            if pred_id != previous_id:  # Fragment detected
+                fragments += 1
+                previous_id = pred_id
+        return fragments
+
+    def get_id_switches_map(self):
+        id_switches_map = {}
+        gt = list(self.map_gt_pr_all.keys())  # List of ground truth IDs
+        for key in gt:
+            pred = self.map_gt_pr_all[key]
+            id_switches_map[key] = self.count_id_switches(
+                pred)  # Count ID switches for each GT ID
+        return id_switches_map

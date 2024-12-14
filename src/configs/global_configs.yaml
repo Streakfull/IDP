@@ -30,10 +30,10 @@ training:
   #ckpt_path: ../logs/training/week7/train_full/train_full/2024_11_28_14_40_42/checkpoints/epoch-best.ckpt
   #ckpt_path: ../logs/training/week7/600kdataset/train_full/2024_11_28_21_34_06/checkpoints/epoch-best.ckpt
   #ckpt_path: ../logs/training/week7/150dataset/train_full/2024_11_29_06_50_43/checkpoints/epoch-best.ckpt
-  ckpt_path: ../logs/training/week8/20kFarDataset/train_full/2024_12_01_04_12_28/checkpoints/epoch-best.ckpt
+  #ckpt_path: ../logs/training/week8/20kFarDataset/train_full/2024_12_01_04_12_28/checkpoints/epoch-best.ckpt
   #ckpt_path: "../logs/training/siamese-resnet/visual_samples_100k/2024_11_14_03_02_33/checkpoints/epoch-best.ckpt"
   #ckpt_path: "../logs/training/eval/fc/10k/uniform/2024_11_14_12_40_23/checkpoints/epoch-18.ckpt"
-  #ckpt_path: ../logs/training/siamese-lin-bn-conv/uniform_samples_200k/2024_11_14_04_21_24/checkpoints/epoch-best.ckpt
+  ckpt_path: ../logs/training/siamese-lin-bn-conv/uniform_samples_200k/2024_11_14_04_21_24/checkpoints/epoch-best.ckpt
 dataset:
   dataset_field: visual_sim_matches
   path: None
@@ -82,8 +82,8 @@ model:
     scheduler_step_size: 50
     scheduler_gamma: 0.5
     use_visual: False
-    use_combined: True
-    use_bb: True
+    use_combined: False
+    use_bb: False
   
 
 

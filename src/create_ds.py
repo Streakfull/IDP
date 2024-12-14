@@ -1,5 +1,6 @@
 from tqdm import tqdm
 from prep.construct_matches_dataset import ConstructMatchesDataset
+from pytorchmodels.DeepSortObjectTrackingSiamese import DeepSortObjectTrackingSiamese
 from prep.pre_process_visual_sim_pair import PreProcessVisualSimPair
 import matplotlib.pyplot as plt
 from pytorchmodels.SiameseCompare import SiamaeseCompare
@@ -26,8 +27,8 @@ import numpy as np
 import os
 import json
 import cv2
-write_path = "../logs/tracking/manCityVsLiverpool/clip_1/week9/enhanced_tracking/frames"
-labels_write_path = "../logs/tracking/manCityVsLiverpool/clip_1/week9/enhanced_tracking/labels"
+write_path = "../logs/tracking/manCityVsLiverpool/clip_1/week9/sort/frames"
+labels_write_path = "../logs/tracking/manCityVsLiverpool/clip_1/week9/sort/labels"
 write_path_deepsort = "../logs/tracking/manCityVsLiverpool/clip_1/week5/debug/frames"
 video_path = "./raw_dataset/mancityVsLiverpool/clip_1.mp4"
 write_path_crops = "../logs/tracking/manCityVsLiverpool/clip_1/week8/simple_tracking/crops"
@@ -72,12 +73,20 @@ def create():
 def write_video():
     print("Writing video")
     sim_tracker = SiameseTracking(
-        video_path, write_path, use_enhanced_tracking=True)
-    y = sim_tracker.process_video(
+        video_path, write_path, use_enhanced_tracking=False)
+    deepsortTracker = DeepSortObjectTrackingSiamese(
+        capture=video_path, write_path=write_path, use_kalman=True,
+        use_visual_siamese=True, use_siamese=False
+
+    )
+    tracker = deepsortTracker
+    y = tracker.process_video(
         video=video_path, write_path=write_path,
         start_frame=None,
         max_frames=None,
-        labels_write_path=labels_write_path)
+        labels_write_path=labels_write_path,
+        print_cost_matrix=False
+    )
 
 
 if __name__ == "__main__":

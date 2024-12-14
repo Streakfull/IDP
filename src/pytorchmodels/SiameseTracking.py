@@ -7,7 +7,7 @@ from ultralytics.utils.ops import xywh2xyxy, scale_boxes
 import torch
 from ultralytics.engine.results import Results
 from deep_sort.Detection import Detection
-from lutils.general import find_object_by_id, write_json, get_img_crop_from_frame, extract_frame_number
+from lutils.general import find_object_by_id, write_json, get_img_crop_from_frame, extract_frame_number, filter_unique_by_id
 from torchvision import transforms
 from deep_sort import nn_matching
 import cv2
@@ -235,7 +235,7 @@ class SiameseTracking(ObjectDetection):
                     if (len(pred_det) > 0):
                         print("KF Detection: ", len(pred_det))
                     detections = detections + pred_det
-
+                detections = filter_unique_by_id(detections)
                 frames = self.plot_boxes(detections=detections, img=img)
                 frame_name = f"frame_{frame}"
                 results = []

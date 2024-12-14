@@ -179,3 +179,4 @@ simpleGan
 v2logs
 *.pt
 notebooks/
+results_*

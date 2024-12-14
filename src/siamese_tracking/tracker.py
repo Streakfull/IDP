@@ -7,6 +7,7 @@ from siamese_tracking.Detection import Detection
 from siamese_tracking.track import Track
 from deep_sort import iou_matching
 from lutils.general import find_object_by_track_id
+from deep_sort.kalman_filter import KalmanFilter
 
 
 nn_margin = 0.2
@@ -22,9 +23,14 @@ class Tracker:
         self.max_iou_distance = max_iou_distance
         self.use_enhance = use_enhance
         self.track_queue_size = track_queue_size
+        self.kf = KalmanFilter()
+        self.last_full_tracks = 0
+        self.n_pred = 0
+        self.current_frame = 0
 
     def update(self, detections, current_frame):
         # Get cost matrix between detections and all tracks
+        self.current_frame = current_frame
         matches, unmatched_tracks, unmatched_detections = \
             self._match(detections)
         if (len(matches) > 0):
@@ -33,7 +39,6 @@ class Tracker:
         for det_idx in unmatched_detections:
             self._initiate_track(detections[det_idx])
 
-            # Update distance metric.
         active_targets = [t.track_id for t in self.tracks]
         features, targets = [], []
         for track in self.tracks:
@@ -42,12 +47,12 @@ class Tracker:
         self.metric.partial_fit(features, targets, active_targets)
         if (self.use_enhance):
             pred_det = self.update_track_enhance_map(
-                detections, unmatched_tracks)
+                detections, unmatched_tracks, current_frame)
             return pred_det
 
         return None
 
-    def update_track_enhance_map(self, detections_t, unmatched_tracks_t):
+    def update_track_enhance_map(self, detections_t, unmatched_tracks_t, current_frame):
         # Matches ---> update previous map
         for detection in detections_t:
             track = self.tracken_map.get(detection.id, None)
@@ -55,7 +60,9 @@ class Tracker:
                 track = find_object_by_track_id(self.tracks, detection.id)
                 self.tracken_map[track.track_id] = track
             track.n_miss = 0
-            track.kf.update(detection.to_tlbr())
+            # track.kf.update(detection.to_tlbr())
+            track.predict(self.kf)
+            track.update_kalman(self.kf, detection)
 
         predicted_det = []
         for tr in unmatched_tracks_t:
@@ -64,16 +71,30 @@ class Tracker:
                 continue
             track = self.tracken_map[track_id]
             track.n_miss += 1
+            if (track.n_miss > 10):
+                del self.tracken_map[track_id]
             if (track.n_miss > 3):
                 continue
-           # track.kf.update(track.detection.to_tlbr())
-            pred = track.kf.predict().flatten()
+
+            pred = track.to_tlbr()
             sc = [0.5, 0]
             pred = np.append(pred, sc)
             det = Detection(torch.Tensor(pred))
             det.set_id(track_id)
             predicted_det.append(det)
-           # predicted_det.append(track.detection)
+
+        if (len(predicted_det) == 0):
+            print("Resetting last full tracks at frame: ",
+                  current_frame, "tracks: ", len(detections_t))
+            self.last_full_tracks = len(detections_t)
+            self.n_pred = 0
+            return []
+
+        if (len(detections_t) >= self.last_full_tracks and self.n_pred < 10):
+            predicted_det = []
+
+        if (len(predicted_det) > 0):
+            self.n_pred += 1
 
         return predicted_det
 
@@ -106,17 +127,20 @@ class Tracker:
         for element in matches_a:
             track_idx = element[0]
             matched_track_ids.append(self.tracks[track_idx].track_id)
-        print("Appeance Matched IDs: ", len(
+        print("Frame: ", self.current_frame, ",", "Appeance Matched IDs: ", len(
             matched_track_ids), [matched_track_ids])
         unmatched_tracks = list(set(unmatched_tracks_a + unmatched_tracks_b))
 
         return matches, unmatched_tracks, unmatched_detections
 
     def _initiate_track(self, detection):
+        mean, covariance = self.kf.initiate(detection.to_xyah())
         track = Track(
             self._next_id,
             detection=detection,
-            queue_size=self.track_queue_size
+            queue_size=self.track_queue_size,
+            mean=mean,
+            covariance=covariance
         )
 
         self.tracks.append(track)

@@ -170,7 +170,7 @@ class DeepSortObjectTrackingYoloFeatures(ObjectDetection):
             w, h = x2-x1, y2-y1
             current_class = self.CLASS_NAMES_DICT[cls]
 
-            if (conf > 0.25):
+            if (conf > 0):
                 # cvzone.putTextRect(
                 #     img, f'{id}, {conf}', (x1, y1), scale=1, thickness=1, colorR=(0, 0, 255))
                 cvzone.putTextRect(
