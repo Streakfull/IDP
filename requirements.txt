@@ -1,0 +1,13 @@
+tensorboard==2.11.0
+einops==0.6.1
+cprint==1.2.2
+omegaconf==2.3.0
+torch==2.2.0
+torchvision==0.17.0
+matplotlib==3.8.4
+numpy~=1.26.4
+tqdm~=4.66.2
+opencv-python==4.10.0.84
+cvzone==1.6.1
+sort-track==0.0.8
+Pillow==9.2.0
