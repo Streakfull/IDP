@@ -1,5 +1,6 @@
 # WS 2024 IDP: Computer Vision for Soccer
 [Google drive link](https://drive.google.com/drive/folders/1Xk-h9kT8T02lWrnZvQBZrkcO-jCTNUFx?usp=drive_link)
+[Demo](https://drive.google.com/drive/folders/1eyM62ljdXLDRLPLwEwb2t6fNtY5PbMZ8?usp=drive_link)
 
 
 ## Setup Instructions
